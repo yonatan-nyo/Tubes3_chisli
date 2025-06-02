@@ -1,0 +1,356 @@
+import flet as ft
+import os
+import subprocess
+import platform
+from typing import Callable, Dict, List
+
+class DetailView:
+    """Detailed view for selected applicant"""
+    
+    def __init__(self, page: ft.Page, on_back_callback: Callable):
+        self.page = page
+        self.on_back_callback = on_back_callback
+    
+    def build(self, applicant_data: Dict) -> ft.Control:
+        """Build detailed view for applicant"""
+        return ft.Column([
+            # Header with back button
+            ft.Container(
+                content=ft.Row([
+                    ft.ElevatedButton(
+                        "← Back to Results",
+                        on_click=lambda e: self.on_back_callback()
+                    ),
+                    ft.Container(expand=True),
+                    ft.Row([
+                        ft.ElevatedButton(
+                            "View Full CV",
+                            on_click=lambda e: self._open_cv_file(applicant_data.get('cv_file_path', ''))
+                        ),
+                        ft.ElevatedButton(
+                            "View Extracted Text",
+                            on_click=lambda e: self._open_txt_file(applicant_data.get('txt_file_path', ''))
+                        )
+                    ], spacing=10)
+                ]),
+                padding=20,
+                bgcolor=ft.Colors.BLUE_50,
+                border_radius=10,
+                margin=ft.Margin(0, 0, 0, 20)
+            ),
+            
+            # Main content - Make scrollable
+            ft.Container(
+                content=ft.Row([
+                    # Left column - Personal info and summary
+                    ft.Container(
+                        content=self._build_personal_section(applicant_data),
+                        width=400,
+                        padding=20,
+                        border=ft.border.all(1, ft.Colors.GREY_300),
+                        border_radius=10
+                    ),
+                    
+                    # Right column - Skills, experience, education
+                    ft.Container(
+                        content=self._build_details_section(applicant_data),
+                        expand=True,
+                        padding=20,
+                        border=ft.border.all(1, ft.Colors.GREY_300),
+                        border_radius=10,
+                        margin=ft.Margin(20, 0, 0, 0)
+                    )
+                ], expand=True, scroll=ft.ScrollMode.AUTO),
+                expand=True,
+                height=600  # Fixed height to enable scrolling
+            )
+        ], expand=True, scroll=ft.ScrollMode.AUTO)
+    
+    def _build_personal_section(self, applicant_data: Dict) -> ft.Control:
+        """Build personal information section"""
+        return ft.Column([
+            # Profile header
+            ft.Container(
+                content=ft.Row([
+                    ft.Column([
+                        ft.Text(
+                            applicant_data.get('name', 'Unknown'),
+                            size=20,
+                            weight=ft.FontWeight.BOLD
+                        ),
+                        ft.Text(
+                            f"ID: {applicant_data.get('id', 'N/A')}",
+                            size=12,
+                            color=ft.Colors.GREY_600
+                        )
+                    ], spacing=2, expand=True)
+                ]),
+                padding=20,
+                bgcolor=ft.Colors.BLUE_50,
+                border_radius=8,
+                margin=ft.Margin(0, 0, 0, 20)
+            ),
+            
+            # Contact information with file paths
+            self._build_info_card("Contact Information", [
+                ("Email", applicant_data.get('email', 'Not provided')),
+                ("Phone", applicant_data.get('phone', 'Not provided')),
+                ("CV Uploaded", applicant_data.get('created_at', 'Unknown')),
+                ("PDF File", os.path.basename(applicant_data.get('cv_file_path', 'N/A'))),
+                ("TXT File", os.path.basename(applicant_data.get('txt_file_path', 'N/A')))
+            ]),
+            
+            ft.Container(height=20),
+            
+            # Summary section
+            self._build_summary_card(applicant_data.get('summary', ''))
+        ], scroll=ft.ScrollMode.AUTO)
+    
+    def _build_details_section(self, applicant_data: Dict) -> ft.Control:
+        """Build details section with skills, experience, education"""
+        return ft.Column([
+            # Skills section
+            self._build_skills_section(applicant_data.get('skills', [])),
+            
+            ft.Container(height=20),
+            
+            # Work experience section
+            self._build_work_experience_section(applicant_data.get('work_experience', [])),
+            
+            ft.Container(height=20),
+            
+            # Education section
+            self._build_education_section(applicant_data.get('education', []))
+        ], scroll=ft.ScrollMode.AUTO)
+    
+    def _build_info_card(self, title: str, info_items: List[tuple]) -> ft.Control:
+        """Build information card"""
+        content = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
+        
+        for label, value in info_items:
+            content.extend([
+                ft.Container(height=8),
+                ft.Row([
+                    ft.Text(f"{label}:", weight=ft.FontWeight.W_500, width=80),
+                    ft.Text(str(value), expand=True)
+                ])
+            ])
+        
+        return ft.Container(
+            content=ft.Column(content),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+    
+    def _build_summary_card(self, summary: str) -> ft.Control:
+        """Build summary card"""
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Summary", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                ft.Text(
+                    summary if summary else "No summary available",
+                    size=14,
+                    color=ft.Colors.GREY_700 if summary else ft.Colors.GREY_500
+                )
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+    
+    def _build_skills_section(self, skills: List[str]) -> ft.Control:
+        """Build skills section"""
+        if not skills:
+            content = ft.Text("No skills information available", color=ft.Colors.GREY_500)
+        else:
+            # Create skill chips
+            skill_chips = [
+                ft.Chip(
+                    label=ft.Text(skill),
+                    bgcolor=ft.Colors.BLUE_100,
+                    color=ft.Colors.BLUE_800
+                )
+                for skill in skills
+            ]
+            
+            content = ft.Column([
+                ft.Row(skill_chips[:10], wrap=True, spacing=8),  # Limit to 10 skills per row
+                *([ft.Row(skill_chips[i:i+10], wrap=True, spacing=8) 
+                   for i in range(10, len(skill_chips), 10)] if len(skill_chips) > 10 else [])
+            ])
+        
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Skills", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                content
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+    
+    def _build_work_experience_section(self, work_experience: List[Dict]) -> ft.Control:
+        """Build work experience section"""
+        if not work_experience:
+            content = ft.Text("No work experience information available", color=ft.Colors.GREY_500)
+        else:
+            exp_items = []
+            for exp in work_experience:
+                exp_items.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(
+                                exp.get('position', 'Unknown Position'),
+                                size=14,
+                                weight=ft.FontWeight.BOLD
+                            ),
+                            ft.Text(
+                                exp.get('company', 'Unknown Company'),
+                                size=12,
+                                color=ft.Colors.BLUE_700
+                            ),
+                            ft.Text(
+                                f"{exp.get('start_date', '')} - {exp.get('end_date', '')}",
+                                size=12,
+                                color=ft.Colors.GREY_600
+                            ),
+                            ft.Text(
+                                exp.get('description', '')[:200] + ("..." if len(exp.get('description', '')) > 200 else ''),
+                                size=12,
+                                color=ft.Colors.GREY_700
+                            ) if exp.get('description') else ft.Container()
+                        ]),
+                        padding=10,
+                        margin=ft.Margin(0, 0, 0, 10),
+                        bgcolor=ft.Colors.GREY_50,
+                        border_radius=6
+                    )
+                )
+            
+            content = ft.Column(exp_items)
+        
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Work Experience", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                content
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+    
+    def _build_education_section(self, education: List[Dict]) -> ft.Control:
+        """Build education section"""
+        if not education:
+            content = ft.Text("No education information available", color=ft.Colors.GREY_500)
+        else:
+            edu_items = []
+            for edu in education:
+                edu_items.append(
+                    ft.Container(
+                        content=ft.Column([
+                            ft.Text(
+                                edu.get('degree', 'Unknown Degree'),
+                                size=14,
+                                weight=ft.FontWeight.BOLD
+                            ),
+                            ft.Text(
+                                edu.get('institution', 'Unknown Institution'),
+                                size=12,
+                                color=ft.Colors.BLUE_700
+                            ),
+                            ft.Row([
+                                ft.Text(
+                                    f"Graduated: {edu.get('graduation_year', 'Unknown')}",
+                                    size=12,
+                                    color=ft.Colors.GREY_600
+                                ),
+                                ft.Text(
+                                    f"GPA: {edu.get('gpa', 'N/A')}",
+                                    size=12,
+                                    color=ft.Colors.GREY_600
+                                ) if edu.get('gpa') else ft.Container()
+                            ])
+                        ]),
+                        padding=10,
+                        margin=ft.Margin(0, 0, 0, 10),
+                        bgcolor=ft.Colors.GREY_50,
+                        border_radius=6
+                    )
+                )
+            
+            content = ft.Column(edu_items)
+        
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Education", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                content
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+    
+    def _open_cv_file(self, file_path: str):
+        """Open CV file with default system application"""
+        if not file_path or not os.path.exists(file_path):
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("CV file not found"),
+                bgcolor=ft.Colors.RED_100
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            return
+        
+        try:
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(file_path)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", file_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", file_path])
+        except Exception as e:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Error opening CV file: {str(e)}"),
+                bgcolor=ft.Colors.RED_100
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+    
+    def _open_txt_file(self, file_path: str):
+        """Open extracted text file with default system application"""
+        if not file_path or not os.path.exists(file_path):
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text("Extracted text file not found"),
+                bgcolor=ft.Colors.RED_100
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
+            return
+        
+        try:
+            system = platform.system()
+            if system == "Windows":
+                os.startfile(file_path)
+            elif system == "Darwin":  # macOS
+                subprocess.run(["open", file_path])
+            else:  # Linux
+                subprocess.run(["xdg-open", file_path])
+        except Exception as e:
+            self.page.snack_bar = ft.SnackBar(
+                content=ft.Text(f"Error opening text file: {str(e)}"),
+                bgcolor=ft.Colors.RED_100
+            )
+            self.page.snack_bar.open = True
+            self.page.update()
