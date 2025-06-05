@@ -72,6 +72,8 @@ def main(page: ft.Page):
             cv_processor.process_csv_resumes
         except Exception as e:
             print(f"Error reading CVs: {e}")
+        
+        print("CV processor initialized successfully")
 
         print("Creating main window...")
         # Create main window - pass SessionLocal instead of db_manager

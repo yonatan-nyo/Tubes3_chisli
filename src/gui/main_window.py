@@ -166,7 +166,7 @@ class MainWindow:
         )
         self.page.snack_bar.open = True
         self.page.update()
-    
+        
     def on_result_selected(self, applicant_id: int):
         """Handle result selection"""
         try:
@@ -218,3 +218,4 @@ class MainWindow:
             self.results_section.update_results(self.search_results) 
         
         self.page.update()
+
