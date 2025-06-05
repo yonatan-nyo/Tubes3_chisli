@@ -36,13 +36,16 @@ class SearchSection:
             keyboard_type=ft.KeyboardType.NUMBER
         )
         
+        # Create threshold label text component
+        self.threshold_label = ft.Text(f"Fuzzy Threshold: {0.7:.1f}", size=14)
+        
         self.fuzzy_threshold_slider = ft.Slider(
             min=0.1,
             max=1.0,
             value=0.7,
             divisions=9,
-            label="Fuzzy Threshold: {value}",
-            width=300
+            width=300,
+            on_change=self.on_threshold_change
         )
         
         self.search_button = ft.ElevatedButton(
@@ -55,6 +58,12 @@ class SearchSection:
             "Clear",
             on_click=self.clear_search
         )
+    
+    def on_threshold_change(self, e):
+        """Handle threshold slider value change"""
+        value = e.control.value
+        self.threshold_label.value = f"Fuzzy Threshold: {value:.1f}"
+        self.page.update()
     
     def build(self) -> ft.Control:
         """Build search section UI"""
@@ -78,7 +87,7 @@ class SearchSection:
             
             # Fuzzy matching threshold
             ft.Column([
-                ft.Text("Fuzzy Matching Threshold", size=14, weight=ft.FontWeight.W_500),
+                self.threshold_label,  # Use the dynamic label
                 self.fuzzy_threshold_slider,
                 ft.Text(
                     "Higher values = more strict matching",
@@ -169,6 +178,9 @@ class SearchSection:
         self.algorithm_dropdown.value = "KMP"
         self.max_results_field.value = "10"
         self.fuzzy_threshold_slider.value = 0.7
+        
+        # Update the threshold label when clearing
+        self.threshold_label.value = f"Fuzzy Threshold: {0.7:.1f}"
         
         # Clear results by calling callback with empty results
         empty_results = {

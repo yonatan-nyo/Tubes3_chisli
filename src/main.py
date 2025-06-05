@@ -67,6 +67,12 @@ def main(page: ft.Page):
         print("Initializing search engine...")
         search_engine = SearchEngine()
 
+        try:
+            print("Reading CVs...")
+            cv_processor.process_csv_resumes
+        except Exception as e:
+            print(f"Error reading CVs: {e}")
+
         print("Creating main window...")
         # Create main window - pass SessionLocal instead of db_manager
         main_window = MainWindow(page, SessionLocal, cv_processor, search_engine)
