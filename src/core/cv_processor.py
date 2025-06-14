@@ -137,12 +137,21 @@ class CVProcessor:
         for line in content.split('\n'):
             line = line.strip()
             if line:
-                skills.append(line)
+                # Check if line contains multiple skills separated by common patterns
+                # Split by multiple spaces (usually indicates separate items)
+                if '  ' in line:  # Two or more spaces
+                    parts = re.split(r'\s{2,}', line)
+                    for part in parts:
+                        part = part.strip()
+                        if part:
+                            skills.append(part)
+                else:
+                    skills.append(line)
 
         return skills
 
     def extract_highlights(self, text: str) -> List[str]:
-        """Extract highlights section"""
+        """Extract highlights section - split by capitalized characters"""
         content = self._extract_section_content(text, 'Highlights')
         if not content:
             return []
@@ -152,7 +161,13 @@ class CVProcessor:
         for line in content.split('\n'):
             line = line.strip()
             if line:
-                highlights.append(line)
+                # Split by capitalized characters (new highlight starts with capital letter)
+                # Use regex to split before capital letters, but keep the capital letter
+                parts = re.split(r'(?=[A-Z][a-z])', line)
+                for part in parts:
+                    part = part.strip()
+                    if part and len(part) > 1:  # Ignore single characters
+                        highlights.append(part)
 
         return highlights
 
@@ -167,7 +182,15 @@ class CVProcessor:
         for line in content.split('\n'):
             line = line.strip()
             if line:
-                accomplishments.append(line)
+                # Check if line contains multiple accomplishments separated by multiple spaces
+                if '  ' in line:  # Two or more spaces
+                    parts = re.split(r'\s{2,}', line)
+                    for part in parts:
+                        part = part.strip()
+                        if part:
+                            accomplishments.append(part)
+                else:
+                    accomplishments.append(line)
 
         return accomplishments
 
@@ -202,31 +225,33 @@ class CVProcessor:
                     parts = re.split(r'\s*[-–]\s*', line)
                     if len(parts) == 2:
                         experience['start_date'] = parts[0].strip()
+                        # Next line should be company + position
                         experience['end_date'] = parts[1].strip()
-
-                # Next line should be company + position
                 if i + 1 < len(lines):
                     company_line = lines[i + 1]
 
                     # Split company line to get company and position
-                    # Look for common separators
-                    if ' ï¼​ ' in company_line:
-                        parts = company_line.split(' ï¼​ ', 1)
+                    # Look for the specific separator pattern "ï¼​"
+                    if 'ï¼​' in company_line:
+                        parts = company_line.split('ï¼​', 1)
                         experience['company'] = parts[0].strip()
                         if len(parts) > 1:
-                            # Everything after the separator is position/location
+                            # Everything after the separator contains location and position
                             remaining = parts[1].strip()
-                            # Try to extract position from the end (usually the last part)
-                            words = remaining.split()
-                            if len(words) >= 2:
-                                # Last 1-3 words are likely the position
-                                position_words = words[-2:] if len(
-                                    words) >= 2 else words[-1:]
-                                experience['position'] = ' '.join(
-                                    position_words)
+                            # Split by comma to separate location from position
+                            location_position = remaining.split(',')
+                            if len(location_position) >= 3:
+                                # Usually format: "City , State Position"
+                                # Take the last part after the state as position
+                                position_part = location_position[-1].strip()
+                                experience['position'] = position_part
+                            else:
+                                # If format is different, use the whole remaining part
+                                experience['position'] = remaining
                     else:
-                        # If no separator, treat as company
+                        # If no separator, treat whole line as company name
                         experience['company'] = company_line
+                        experience['position'] = 'Not specified'
 
                     i += 2  # Move past date and company lines
 
@@ -283,11 +308,10 @@ class CVProcessor:
 
                 # Next line should be school + major
                 if i + 1 < len(lines):
-                    school_line = lines[i + 1]
-
                     # Parse school line to separate institution and degree
-                    if ' ï¼​ ' in school_line:
-                        parts = school_line.split(' ï¼​ ', 1)
+                    school_line = lines[i + 1]
+                    if 'ï¼​' in school_line:
+                        parts = school_line.split('ï¼​', 1)
                         education['institution'] = parts[0].strip()
                         if len(parts) > 1:
                             # Look for degree info after location
@@ -297,6 +321,23 @@ class CVProcessor:
                                 degree_parts = remaining.split(':', 1)
                                 if len(degree_parts) == 2:
                                     education['degree'] = degree_parts[1].strip()
+                                    # Keep the part before : as additional info but extract degree
+                                    location_degree = degree_parts[0].strip()
+                                    # Try to extract degree from location_degree
+                                    degree_words = location_degree.split()
+                                    if degree_words:
+                                        # Usually the degree is at the end before the colon
+                                        potential_degree = ' '.join(
+                                            degree_words[-2:]) if len(degree_words) >= 2 else degree_words[-1]
+                                        # If nothing after colon
+                                        if not education['degree']:
+                                            education['degree'] = potential_degree
+                            else:
+                                # No colon, try to extract degree from the remaining part
+                                location_parts = remaining.split(',')
+                                if len(location_parts) >= 3:
+                                    # Usually format: "City, State, Country DegreeType"
+                                    education['degree'] = location_parts[-1].strip()
                     else:
                         # If no separator, treat as institution
                         education['institution'] = school_line

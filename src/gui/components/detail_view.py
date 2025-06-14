@@ -107,10 +107,22 @@ class DetailView:
         ], spacing=0)
 
     def _build_details_section(self, applicant_data: Dict) -> ft.Control:
-        """Build details section with skills, experience, education"""
+        """Build details section with skills, highlights, accomplishments, experience, education"""
         return ft.Column([
             # Skills section
             self._build_skills_section(applicant_data.get('skills', [])),
+
+            ft.Container(height=20),
+
+            # Highlights section
+            self._build_highlights_section(
+                applicant_data.get('highlights', [])),
+
+            ft.Container(height=20),
+
+            # Accomplishments section
+            self._build_accomplishments_section(
+                applicant_data.get('accomplishments', [])),
 
             ft.Container(height=20),
 
@@ -118,9 +130,7 @@ class DetailView:
             self._build_work_experience_section(
                 applicant_data.get('work_experience', [])),
 
-            ft.Container(height=20),
-
-            # Education section
+            ft.Container(height=20),            # Education section
             self._build_education_section(applicant_data.get('education', []))
         ], scroll=ft.ScrollMode.AUTO)
 
@@ -174,7 +184,7 @@ class DetailView:
         """Build skills section"""
         if not skills:
             content = ft.Text("No skills information available",
-                              color=ft.Colors.WHITE)
+                              color=ft.Colors.GREY_500)
         else:
             # Create skill chips with blue background and white text
             skill_chips = [
@@ -214,29 +224,41 @@ class DetailView:
         else:
             exp_items = []
             for exp in work_experience:
+                # Build the header with position and company
+                position = exp.get('position', 'Unknown Position')
+                company = exp.get('company', 'Unknown Company')
+                start_date = exp.get('start_date', '')
+                end_date = exp.get('end_date', '')
+
+                # Create a more informative header
+                header_text = f"{position}"
+                if position != 'Not specified' and company:
+                    header_text = f"{position} at {company}"
+                elif company:
+                    header_text = company
+
                 exp_items.append(
                     ft.Container(
                         content=ft.Column([
                             ft.Text(
-                                exp.get('position', 'Unknown Position'),
+                                header_text,
                                 size=14,
-                                weight=ft.FontWeight.BOLD
+                                weight=ft.FontWeight.BOLD,
+                                no_wrap=False,
+                                overflow=ft.TextOverflow.VISIBLE
                             ),
                             ft.Text(
-                                exp.get('company', 'Unknown Company'),
-                                size=12,
-                                color=ft.Colors.BLUE_700
-                            ),
-                            ft.Text(
-                                f"{exp.get('start_date', '')} - {exp.get('end_date', '')}",
+                                f"{start_date} - {end_date}" if start_date and end_date else
+                                start_date if start_date else "Date not specified",
                                 size=12,
                                 color=ft.Colors.GREY_600
-                            ),                            ft.Text(
-                                exp.get('description', '')[
-                                    :200] + ("..." if len(exp.get('description', '')) > 200 else ''),
+                            ),
+                            ft.Container(height=5),
+                            ft.Text(
+                                exp.get('description', ''),
                                 size=12,
                                 color=ft.Colors.GREY_700,
-                                no_wrap=False,  # Allow text wrapping
+                                no_wrap=False,
                                 overflow=ft.TextOverflow.VISIBLE
                             ) if exp.get('description') else ft.Container()
                         ]),
@@ -307,6 +329,92 @@ class DetailView:
         return ft.Container(
             content=ft.Column([
                 ft.Text("Education", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                content
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+
+    def _build_highlights_section(self, highlights: List[str]) -> ft.Control:
+        """Build highlights section"""
+        if not highlights:
+            content = ft.Text(
+                "No highlights information available", color=ft.Colors.GREY_500)
+        else:
+            highlight_items = []
+            for highlight in highlights:
+                highlight_items.append(
+                    ft.Container(
+                        content=ft.Row([
+                            ft.Icon(ft.Icons.STAR,
+                                    color=ft.Colors.AMBER, size=16),
+                            ft.Container(width=8),
+                            ft.Text(
+                                highlight,
+                                size=12,
+                                color=ft.Colors.GREY_700,
+                                no_wrap=False,
+                                overflow=ft.TextOverflow.VISIBLE,
+                                expand=True
+                            )
+                        ]),
+                        padding=ft.Padding(5, 5, 5, 5),
+                        margin=ft.Margin(0, 0, 0, 5),
+                        bgcolor=ft.Colors.AMBER_50,
+                        border_radius=4
+                    )
+                )
+            content = ft.Column(highlight_items)
+
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Highlights", size=16, weight=ft.FontWeight.BOLD),
+                ft.Container(height=10),
+                content
+            ]),
+            padding=15,
+            border=ft.border.all(1, ft.Colors.GREY_300),
+            border_radius=8,
+            bgcolor=ft.Colors.WHITE
+        )
+
+    def _build_accomplishments_section(self, accomplishments: List[str]) -> ft.Control:
+        """Build accomplishments section"""
+        if not accomplishments:
+            content = ft.Text(
+                "No accomplishments information available", color=ft.Colors.GREY_500)
+        else:
+            accomplishment_items = []
+            for accomplishment in accomplishments:
+                accomplishment_items.append(
+                    ft.Container(
+                        content=ft.Row([
+                            ft.Icon(ft.Icons.EMOJI_EVENTS,
+                                    color=ft.Colors.GREEN, size=16),
+                            ft.Container(width=8),
+                            ft.Text(
+                                accomplishment,
+                                size=12,
+                                color=ft.Colors.GREY_700,
+                                no_wrap=False,
+                                overflow=ft.TextOverflow.VISIBLE,
+                                expand=True
+                            )
+                        ]),
+                        padding=ft.Padding(5, 5, 5, 5),
+                        margin=ft.Margin(0, 0, 0, 5),
+                        bgcolor=ft.Colors.GREEN_50,
+                        border_radius=4
+                    )
+                )
+            content = ft.Column(accomplishment_items)
+
+        return ft.Container(
+            content=ft.Column([
+                ft.Text("Accomplishments", size=16, weight=ft.FontWeight.BOLD),
                 ft.Container(height=10),
                 content
             ]),
