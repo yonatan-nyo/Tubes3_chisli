@@ -134,10 +134,9 @@ class DetailView:
                 ("Phone", safe_get_str(applicant_data, 'phone', 'Not provided')),
                 ("Address", safe_get_str(applicant_data, 'address', 'Not provided')),
                 ("Date of Birth", safe_get_str(
-                    applicant_data, 'date_of_birth', 'Not provided')),
-                ("Role", safe_get_str(applicant_data,
-                 'applicant_role', 'Not specified')),
-                ("CV Uploaded", safe_get_str(applicant_data, 'created_at', 'Unknown')),                ("PDF File", os.path.basename(safe_get_str(
+                    applicant_data, 'date_of_birth', 'Not provided')),                ("Role", safe_get_str(applicant_data,
+                                                                                                            'applicant_role', 'Not specified')),
+                ("PDF File", os.path.basename(safe_get_str(
                     applicant_data, 'cv_path', 'N/A'))),
                 ("TXT File", "Computed from CV")
             ]),

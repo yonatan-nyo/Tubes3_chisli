@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, Date, ForeignKey, func
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey
 from sqlalchemy.orm import relationship
 from typing import Dict
 import json
@@ -14,9 +14,6 @@ class ApplicantProfile(Base):
     date_of_birth = Column(Date, nullable=True)
     address = Column(String(255), nullable=True)
     phone_number = Column(String(20), nullable=True)
-    created_at = Column(DateTime, default=func.current_timestamp())
-    updated_at = Column(DateTime, default=func.current_timestamp(),
-                        onupdate=func.current_timestamp())
 
     # Relationship to applicant details
     details = relationship("ApplicantDetail", back_populates="profile")
@@ -29,9 +26,7 @@ class ApplicantProfile(Base):
             'last_name': self.last_name,
             'date_of_birth': self.date_of_birth,
             'address': self.address,
-            'phone_number': self.phone_number,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at
+            'phone_number': self.phone_number
         }
 
     @classmethod
@@ -57,9 +52,6 @@ class ApplicantDetail(Base):
         'applicant_profiles.applicant_id'), nullable=False)
     applicant_role = Column(String(100), nullable=True)
     cv_path = Column(Text, nullable=False)
-    created_at = Column(DateTime, default=func.current_timestamp())
-    updated_at = Column(DateTime, default=func.current_timestamp(),
-                        onupdate=func.current_timestamp())
 
     # Relationship to applicant profile
     profile = relationship("ApplicantProfile", back_populates="details")
@@ -70,9 +62,7 @@ class ApplicantDetail(Base):
             'detail_id': self.detail_id,
             'applicant_id': self.applicant_id,
             'applicant_role': self.applicant_role,
-            'cv_path': self.cv_path,
-            'created_at': self.created_at,
-            'updated_at': self.updated_at
+            'cv_path': self.cv_path
         }
 
     @classmethod

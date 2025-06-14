@@ -144,9 +144,13 @@ def init_db(force_recreate: bool = False):
                     "💡 If you need a fresh database, manually run with force_recreate=True")
                 print("💡 Otherwise, please check your database configuration and schema")
                 raise Exception(
+                    # Don't automatically force recreate - this deletes all data!
                     "Schema migration failed - please check database manually")
-                # Don't automatically force recreate - this deletes all data!
                 # If you really need to recreate, run with force_recreate=True manually
+
+            # Clean up obsolete timestamp columns
+            print("Cleaning up obsolete timestamp columns...")
+            drop_obsolete_timestamp_columns()
 
         print("Database initialization completed successfully")
         return True
@@ -200,3 +204,35 @@ def check_existing_data():
     except Exception as e:
         print(f"Could not check existing data: {e}")
         return False
+
+
+def drop_obsolete_timestamp_columns():
+    """Drop obsolete created_at and updated_at columns from all tables"""
+    try:
+        from . import applicant
+
+        inspector = inspect(engine)
+        timestamp_columns = ['created_at', 'updated_at']
+
+        with engine.connect() as conn:
+            for table_name in ['applicant_profiles', 'applicant_details']:
+                if table_name in inspector.get_table_names():
+                    existing_columns = [col['name']
+                                        for col in inspector.get_columns(table_name)]
+
+                    for col_name in timestamp_columns:
+                        if col_name in existing_columns:
+                            try:
+                                alter_sql = f"ALTER TABLE {table_name} DROP COLUMN {col_name}"
+                                conn.execute(text(alter_sql))
+                                print(
+                                    f"Dropped obsolete column '{col_name}' from table '{table_name}'")
+                            except Exception as e:
+                                print(
+                                    f"Failed to drop column {col_name} from {table_name}: {e}")
+
+            conn.commit()
+            print("Obsolete timestamp columns cleanup completed")
+
+    except Exception as e:
+        print(f"Error during timestamp columns cleanup: {e}")

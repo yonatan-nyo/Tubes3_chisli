@@ -6,7 +6,7 @@ This module provides type checking and validation utilities to prevent runtime e
 from typing import Dict, List, Any, Optional, Union, TypeGuard, TypeVar, Callable
 import json
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, date
 
 T = TypeVar('T')
 
@@ -27,7 +27,6 @@ class ApplicantDataSchema:
     education: List[Dict[str, Any]]
     highlights: List[str]
     accomplishments: List[str]
-    created_at: str
     applicant_role: str
     address: str
     date_of_birth: str
@@ -46,10 +45,8 @@ class ApplicantDataSchema:
             summary=safe_get_str(data, 'summary', ''),
             skills=safe_get_list(data, 'skills', []),
             work_experience=safe_get_list(data, 'work_experience', []),
-            education=safe_get_list(data, 'education', []),
-            highlights=safe_get_list(data, 'highlights', []),
+            education=safe_get_list(data, 'education', []),            highlights=safe_get_list(data, 'highlights', []),
             accomplishments=safe_get_list(data, 'accomplishments', []),
-            created_at=safe_get_str(data, 'created_at', 'Unknown'),
             applicant_role=safe_get_str(
                 data, 'applicant_role', 'Not specified'),
             address=safe_get_str(data, 'address', 'Not provided'),
@@ -69,10 +66,8 @@ class ApplicantDataSchema:
             'summary': self.summary,
             'skills': self.skills,
             'work_experience': self.work_experience,
-            'education': self.education,
-            'highlights': self.highlights,
+            'education': self.education,            'highlights': self.highlights,
             'accomplishments': self.accomplishments,
-            'created_at': self.created_at,
             'applicant_role': self.applicant_role,
             'address': self.address,
             'date_of_birth': self.date_of_birth
@@ -278,11 +273,17 @@ def ensure_list(value: Any, default: Optional[List[Any]] = None) -> List[Any]:
 
 
 def format_datetime_safe(dt: Any, format_str: str = "%Y-%m-%d %H:%M:%S", default: str = "Unknown") -> str:
-    """Safely format datetime object to string"""
+    """Safely format datetime or date object to string"""
     if dt is None:
         return default
 
     if isinstance(dt, datetime):
+        try:
+            return dt.strftime(format_str)
+        except (ValueError, TypeError):
+            return default
+
+    if isinstance(dt, date):
         try:
             return dt.strftime(format_str)
         except (ValueError, TypeError):

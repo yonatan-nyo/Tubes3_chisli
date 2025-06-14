@@ -417,12 +417,10 @@ class CVProcessor:
                 final_cv_path_for_db = txt_path_for_db  # Use txt_path as fallback for cv_path
             else:
                 # This is a last resort, should ideally not be hit if txt_file always saves
+                # If no applicant_id is provided, use a random existing applicant
                 final_cv_path_for_db = f"MISSING_FILE_PATH_FOR_{source_reference.replace('.', '_')}"
-
-        # If no applicant_id is provided, create a random applicant or use a default one
         if applicant_id is None:
-            # Create ApplicantDetail data - only store essential fields
-            applicant_id = self._get_or_create_random_applicant()
+            applicant_id = self._get_random_existing_applicant()
 
         applicant_detail_data = {
             'applicant_id': applicant_id,
@@ -447,38 +445,39 @@ class CVProcessor:
         finally:
             db.close()
 
-    def _get_or_create_random_applicant(self) -> int:
-        """Get or create a 'random' applicant profile for uploads without specified applicant"""
+    def _get_random_existing_applicant(self) -> int:
+        """Get a random existing applicant profile for uploads without specified applicant"""
         db = SessionLocal()
         try:
-            # Try to find an existing "Random Applicant" profile
-            random_applicant = db.query(ApplicantProfile).filter(
-                ApplicantProfile.first_name == "Random",
-                ApplicantProfile.last_name == "Applicant"
-            ).first()
+            # Get a random existing applicant from the database
+            import random
+            applicants = db.query(ApplicantProfile).all()
 
-            if random_applicant:
+            if applicants:
+                # Select a random applicant from existing ones
+                random_applicant = random.choice(applicants)
                 return random_applicant.applicant_id
+            else:
+                # If no applicants exist, create a default one
+                default_applicant = ApplicantProfile(
+                    first_name="Default",
+                    last_name="User",
+                    address="System generated profile for CV uploads"
+                )
 
-            # Create a new random applicant profile
-            random_applicant = ApplicantProfile(
-                first_name="Random",
-                last_name="Applicant",
-                address="Generated for CV uploads without specified applicant"
-            )
+                db.add(default_applicant)
+                db.commit()
+                db.refresh(default_applicant)
 
-            db.add(random_applicant)
-            db.commit()
-            db.refresh(random_applicant)
-
-            print(
-                f"Created new random applicant with ID: {random_applicant.applicant_id}")
-            return random_applicant.applicant_id
+                print(
+                    f"Created default applicant with ID: {default_applicant.applicant_id}")
+                return default_applicant.applicant_id
 
         except Exception as e:
-            print(f"Error creating random applicant: {e}")
+            print(f"Error getting random applicant: {e}")
             db.rollback()
-            # Return a default ID (1) as fallback            return 1
+            # Return a default ID (1) as fallback
+            return 1
         finally:
             db.close()
 

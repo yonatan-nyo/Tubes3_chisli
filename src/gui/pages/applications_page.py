@@ -117,7 +117,7 @@ class ApplicationsPage:
             db = self.session_factory()
             try:
                 applications = db.query(ApplicantDetail).join(ApplicantProfile).order_by(
-                    ApplicantDetail.created_at.desc()).all()
+                    ApplicantDetail.detail_id.desc()).all()
 
                 if not applications:
                     return ft.Container(
@@ -176,11 +176,8 @@ class ApplicationsPage:
                                     weight=ft.FontWeight.BOLD),
                             ft.Text(application.applicant_role or "No role specified",
                                     size=14, color=ft.Colors.GREY_600),
-                        ], expand=True),
-                        ft.Column([
+                        ], expand=True),                        ft.Column([
                             ft.Text(f"ID: {application.detail_id}",
-                                    size=12, color=ft.Colors.GREY_500),
-                            ft.Text(application.created_at.strftime("%Y-%m-%d %H:%M") if application.created_at else "",
                                     size=12, color=ft.Colors.GREY_500),
                         ], horizontal_alignment=ft.CrossAxisAlignment.END),
                     ]),

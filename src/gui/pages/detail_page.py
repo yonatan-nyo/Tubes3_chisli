@@ -51,9 +51,7 @@ class DetailPage:
                         'applicant_id': applicant_detail.applicant_id,
                         'name': full_name,
                         'email': 'Not provided',  # Email removed from new schema
-                        'phone': safe_get_str({'phone': profile.phone_number}, 'phone', 'Not provided'),
-                        'cv_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
-                        'created_at': format_datetime_safe(applicant_detail.created_at, "%Y-%m-%d %H:%M:%S", 'Unknown'),
+                        'phone': safe_get_str({'phone': profile.phone_number}, 'phone', 'Not provided'),                        'cv_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
                         'applicant_role': safe_get_str({'role': applicant_detail.applicant_role}, 'role', 'Not specified'),
                         'address': safe_get_str({'address': profile.address}, 'address', 'Not provided'),
                         'date_of_birth': format_datetime_safe(profile.date_of_birth, "%Y-%m-%d", 'Not provided')}
