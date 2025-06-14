@@ -186,12 +186,19 @@ class DetailView:
             content = ft.Text("No skills information available",
                               color=ft.Colors.GREY_500)
         else:
-            # Create skill chips with blue background and white text
+            # Create skill containers with blue background and white text
             skill_chips = [
-                ft.Chip(
-                    label=ft.Text(skill, color=ft.Colors.WHITE),
-                    bgcolor=ft.Colors.BLUE,
-                    color=ft.Colors.BLUE
+                ft.Container(
+                    content=ft.Text(
+                        skill,
+                        size=14,
+                        color=ft.Colors.WHITE,
+                        weight=ft.FontWeight.W_500
+                    ),
+                    padding=ft.Padding(12, 8, 12, 8),
+                    bgcolor=ft.Colors.BLUE_800,
+                    border_radius=20,
+                    margin=ft.Margin(2, 2, 2, 2)
                 )
                 for skill in skills
             ]

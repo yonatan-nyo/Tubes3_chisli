@@ -47,30 +47,16 @@ class CVProcessor:
             return ""
 
     def extract_personal_info(self, text: str) -> Dict[str, str]:
-        """Extract personal information from CV text - first line after headers is the applicant name"""
+        """Extract personal information from CV text - first line is the applicant name"""
         info = {'name': '', 'email': '', 'phone': ''}
         if not text:
             return info
 
         lines = [line.strip() for line in text.split('\n') if line.strip()]
 
-        # Skip header lines and find the first content line (which is the name)
-        name = ""
-        header_ended = False
-
-        for line in lines:
-            # Skip header lines
-            if "====" in line:
-                header_ended = True
-                continue
-
-            if any(header in line for header in ["EXTRACTED TEXT FROM CV", "Source Reference:", "Extraction Date:"]):
-                continue
-
-            # First line after headers is the name
-            if header_ended and line and not name:
-                name = line
-                break
+        # The first line is always the applicant name
+        if lines:
+            info['name'] = lines[0]
 
         # Extract email and phone using regex from full text
         full_text = ' '.join(lines)
@@ -85,7 +71,6 @@ class CVProcessor:
         if phone_match:
             info['phone'] = phone_match.group()
 
-        info['name'] = name
         return info
 
     def _extract_section_content(self, text: str, section_name: str) -> str:
