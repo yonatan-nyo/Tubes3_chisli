@@ -1,4 +1,4 @@
-import pypdf
+import pdfplumber
 import re
 import os
 from typing import Dict, List, Optional
@@ -29,18 +29,18 @@ class CVProcessor:
             os.makedirs(self.txt_storage_path)
 
     def extract_text_from_pdf(self, file_path: str) -> str:
-        """Extract text from PDF file"""
         try:
-            with open(file_path, 'rb') as file:
-                pdf_reader = pypdf.PdfReader(file)
-                text = ""
-                for page in pdf_reader.pages:
-                    extracted_page_text = page.extract_text()
-                    if extracted_page_text:
-                        text += extracted_page_text + "\n"
-                return text.strip()
+            with pdfplumber.open(file_path) as pdf:
+                full_text = []
+                for page in pdf.pages:
+                    # The .extract_text() method in pdfplumber is more advanced
+                    # and attempts to reconstruct the reading order.
+                    page_text = page.extract_text(x_tolerance=2) # Adjust tolerance to merge nearby words
+                    if page_text:
+                        full_text.append(page_text)
+                return "\n".join(full_text)
         except Exception as e:
-            print(f"Error extracting text from PDF {file_path}: {e}")
+            print(f"Error extracting text with pdfplumber from {file_path}: {e}")
             return ""
 
     def extract_personal_info(self, text: str) -> Dict[str, str]:
