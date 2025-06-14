@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker, DeclarativeBase
 # Database configuration - use environment variables or defaults
 DATABASE_HOST = os.getenv("DATABASE_HOST", "localhost")
 DATABASE_USER = os.getenv("DATABASE_USER", "root")
-DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "123")
+DATABASE_PASSWORD = os.getenv("DATABASE_PASSWORD", "")
 DATABASE_NAME = os.getenv("DATABASE_NAME", "cv_chisli")
 DATABASE_PORT = os.getenv("DATABASE_PORT", "3306")
 

@@ -167,6 +167,41 @@ class MainWindow:
         self.page.snack_bar.open = True
         self.page.update()
         
+    # def on_result_selected(self, applicant_id: int):
+    #     """Handle result selection"""
+    #     try:
+    #         db = self.session_factory()
+    #         try:
+    #             applicant = db.query(Applicant).filter(Applicant.id == applicant_id).first()
+    #             if applicant:
+    #                 applicant_data = applicant.to_dict()  # Ensure this method exists and works
+                    
+    #                 # Prepare the detail view content
+    #                 detail_view_content = self.detail_view.build(applicant_data)
+                    
+    #                 self.current_view = "detail"
+    #                 self.page.clean()  # Clear all existing content from the page
+    #                 self.page.add(detail_view_content)  # Add the new detail view
+    #                 self.page.update()
+    #             else:
+    #                 self.page.snack_bar = ft.SnackBar(
+    #                     content=ft.Text(f"Applicant with ID {applicant_id} not found."),
+    #                     bgcolor=ft.Colors.YELLOW_200
+    #                 )
+    #                 self.page.snack_bar.open = True
+    #                 self.page.update()
+    #                 print(f"Applicant with ID {applicant_id} not found") # Keep console log for debugging
+    #         finally:
+    #             db.close()
+    #     except Exception as e:
+    #         self.page.snack_bar = ft.SnackBar(
+    #             content=ft.Text(f"Error loading applicant details: {str(e)}"),
+    #             bgcolor=ft.Colors.RED_100
+    #         )
+    #         self.page.snack_bar.open = True
+    #         self.page.update()
+    #         print(f"Error loading applicant details: {e}") # Keep console log
+
     def on_result_selected(self, applicant_id: int):
         """Handle result selection"""
         try:
@@ -174,11 +209,76 @@ class MainWindow:
             try:
                 applicant = db.query(Applicant).filter(Applicant.id == applicant_id).first()
                 if applicant:
-                    applicant_data = applicant.to_dict()  # Ensure this method exists and works
-                    
+                    applicant_data = applicant.to_dict()
+
+                    # <--- COMPREHENSIVE DEBUGGING BLOCK FOR ALL FIELDS --->
+                    print("\n" + "="*25 + " DEBUG START " + "="*25)
+                    print(f"--- All Data for Applicant ID: {applicant_data.get('id')} ---")
+
+                    # --- Basic Information ---
+                    print("\n[-- Personal Info --]")
+                    print(f"  Name: {applicant_data.get('name')}")
+                    print(f"  Email: {applicant_data.get('email')}")
+                    print(f"  Phone: {applicant_data.get('phone')}")
+
+                    # --- File Paths and Timestamps ---
+                    print("\n[-- File & Time Info --]")
+                    print(f"  CV File Path: {applicant_data.get('cv_file_path')}")
+                    print(f"  TXT File Path: {applicant_data.get('txt_file_path')}")
+                    print(f"  Created At: {applicant_data.get('created_at')}")
+                    print(f"  Updated At: {applicant_data.get('updated_at')}")
+
+                    # --- Skills (List) ---
+                    print("\n[-- Skills --]")
+                    skills_list = applicant_data.get('skills', [])
+                    if skills_list:
+                        for i, skill in enumerate(skills_list):
+                            print(f"  - Skill #{i+1}: {skill}")
+                    else:
+                        print("  No skills listed.")
+
+                    # --- Work Experience (List of Dictionaries) ---
+                    print("\n[-- Work Experience --]")
+                    work_experience_list = applicant_data.get('work_experience', [])
+                    if work_experience_list:
+                        for i, exp in enumerate(work_experience_list):
+                            print(f"  - Experience #{i+1}:")
+                            print(f"    Position: {exp.get('position')}")
+                            print(f"    Company: {exp.get('company')}")
+                            print(f"    Dates: {exp.get('start_date')} to {exp.get('end_date')}")
+                            print(f"    Description: {exp.get('description', 'N/A')[:100]}...") # Truncated
+                    else:
+                        print("  No work experience listed.")
+
+                    # --- Education (List of Dictionaries) ---
+                    print("\n[-- Education --]")
+                    education_list = applicant_data.get('education', [])
+                    if education_list:
+                        for i, edu in enumerate(education_list):
+                            print(f"  - Education #{i+1}:")
+                            print(f"    Degree: {edu.get('degree')}")
+                            print(f"    Institution: {edu.get('institution')}")
+                            print(f"    Year: {edu.get('graduation_year')}")
+                            print(f"    GPA: {edu.get('gpa', 'N/A')}")
+                    else:
+                        print("  No education listed.")
+
+                    # --- Summary (String) ---
+                    print("\n[-- Summary --]")
+                    summary = applicant_data.get('summary', '')
+                    print(f"  {summary if summary else 'No summary available.'}")
+
+                    # --- Full Extracted Text (String) ---
+                    print("\n[-- Full Extracted Text (first 200 chars) --]")
+                    extracted_text = applicant_data.get('extracted_text', '')
+                    print(f"  {extracted_text[:200] if extracted_text else 'No extracted text.'}...")
+
+                    print("\n" + "="*26 + " DEBUG END " + "="*26 + "\n")
+
+
                     # Prepare the detail view content
                     detail_view_content = self.detail_view.build(applicant_data)
-                    
+
                     self.current_view = "detail"
                     self.page.clean()  # Clear all existing content from the page
                     self.page.add(detail_view_content)  # Add the new detail view
