@@ -1,5 +1,6 @@
 # Database models package
 from .database import Base, engine, SessionLocal
-from .applicant import Applicant
+from .applicant import ApplicantProfile, ApplicantDetail
 
-__all__ = ["Base", "engine", "SessionLocal", "Applicant"]
+__all__ = ["Base", "engine", "SessionLocal",
+           "ApplicantProfile", "ApplicantDetail"]

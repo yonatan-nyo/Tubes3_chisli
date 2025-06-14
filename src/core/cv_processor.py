@@ -4,14 +4,10 @@ import os
 from typing import Dict, List, Optional
 from datetime import datetime
 import shutil
-import pandas as pd  # Added for CSV processing
-# Assuming your database.py defines SessionLocal and Base,
-# and your Applicant model is in a file from which it can be imported.
-# If Applicant model is in, say, models.py, it would be:
-# from .models import Applicant
-# from .database import SessionLocal
-# For now, assuming direct import as per previous context:
-from database import SessionLocal, Applicant
+import pandas as pd
+import json
+from database.models.applicant import ApplicantProfile, ApplicantDetail
+from database.models.database import SessionLocal
 
 
 class CVProcessor:
@@ -33,8 +29,7 @@ class CVProcessor:
         try:
             with pdfplumber.open(file_path) as pdf:
                 full_text = []
-                for page in pdf.pages:
-                    # The .extract_text() method in pdfplumber is more advanced
+                for page in pdf.pages:                    # The .extract_text() method in pdfplumber is more advanced
                     # and attempts to reconstruct the reading order.
                     # Adjust tolerance to merge nearby words
                     page_text = page.extract_text(x_tolerance=2)
@@ -46,32 +41,24 @@ class CVProcessor:
                 f"Error extracting text with pdfplumber from {file_path}: {e}")
             return ""
 
-    def extract_personal_info(self, text: str) -> Dict[str, str]:
-        """Extract personal information from CV text - first line is the applicant name"""
-        info = {'name': '', 'email': '', 'phone': ''}
+    def extract_applicant_role(self, text: str) -> str:
+        """Extract applicant role from CV text - first line is the applicant role"""
         if not text:
-            return info
+            return ""
 
         lines = [line.strip() for line in text.split('\n') if line.strip()]
 
-        # The first line is always the applicant name
+        # The first line is the applicant role
         if lines:
-            info['name'] = lines[0]
+            return lines[0]
 
-        # Extract email and phone using regex from full text
-        full_text = ' '.join(lines)
-        email_pattern = r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b'
-        phone_pattern = r'(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}|\+\d{1,3}[-.\s]?\d{3,4}[-.\s]?\d{3,4}[-.\s]?\d{3,4})'
+        return ""
 
-        email_match = re.search(email_pattern, full_text)
-        phone_match = re.search(phone_pattern, full_text)
-
-        if email_match:
-            info['email'] = email_match.group()
-        if phone_match:
-            info['phone'] = phone_match.group()
-
-        return info
+    def extract_personal_info(self, text: str) -> Dict[str, str]:
+        """Extract personal information from CV text - deprecated, keeping for compatibility"""
+        # This method is now deprecated since we don't extract personal info from CV text anymore
+        # The first line is the applicant role, not personal info
+        return {}
 
     def _extract_section_content(self, text: str, section_name: str) -> str:
         """Extract content between section headers using case insensitive matching"""
@@ -390,7 +377,7 @@ class CVProcessor:
                 f"Error saving extracted text to file for {original_cv_filename}: {e}")
             return ""
 
-    def process_cv_file(self, file_path: str, original_filename: str) -> Optional[int]:
+    def process_cv_file(self, file_path: str, original_filename: str, applicant_id: Optional[int] = None) -> Optional[int]:
         """Process uploaded CV file (PDF) and save to database"""
         try:
             extracted_text = self.extract_text_from_pdf(file_path)
@@ -411,19 +398,21 @@ class CVProcessor:
             return self._process_common_resume_text(extracted_text, original_filename,
                                                     cv_path_for_db=stored_cv_path,
                                                     txt_path_for_db=txt_filepath,
-                                                    category=None)  # Or determine category if available
+                                                    category=None,
+                                                    applicant_id=applicant_id)
         except Exception as e:
             print(f"Error processing CV file {original_filename}: {e}")
             return None
 
     def _process_common_resume_text(self, extracted_text: str, source_reference: str,
                                     cv_path_for_db: Optional[str], txt_path_for_db: Optional[str],
-                                    category: Optional[str] = None) -> Optional[int]:
-        """Common logic to process extracted text and save to DB."""
+                                    category: Optional[str] = None, applicant_id: Optional[int] = None) -> Optional[int]:
+        """Common logic to process extracted text and save to DB using new schema."""
         print(f"\n=== DEBUG: Processing CV - {source_reference} ===")
 
-        personal_info = self.extract_personal_info(extracted_text)
-        print(f"Personal Info extracted: {personal_info}")
+        # Extract applicant role from first line
+        applicant_role = self.extract_applicant_role(extracted_text)
+        print(f"Applicant Role extracted: {applicant_role}")
 
         summary = self.extract_summary(extracted_text)
         print(
@@ -451,15 +440,6 @@ class CVProcessor:
 
         print("=== END DEBUG OUTPUT ===\n")
 
-        applicant_name = personal_info.get('name')
-        if not applicant_name or applicant_name.isspace():
-            match_id = re.search(
-                r'_([^_]+)\.(txt|pdf)$', source_reference, re.I)
-            placeholder_id = match_id.group(1) if match_id else "UnknownID"
-            applicant_name = f"Applicant {placeholder_id}"
-            if category:  # Add category to placeholder name if available and name is missing
-                applicant_name += f" ({category})"
-
         # Ensure cv_file_path is never None to satisfy nullable=False constraint
         final_cv_path_for_db = cv_path_for_db
         if final_cv_path_for_db is None:
@@ -469,7 +449,7 @@ class CVProcessor:
                 # This is a last resort, should ideally not be hit if txt_file always saves
                 final_cv_path_for_db = f"MISSING_FILE_PATH_FOR_{source_reference.replace('.', '_')}"
 
-        # Ensure txt_file_path is also not None if DB expects it (model shows nullable=True, so None is okay)
+        # Ensure txt_file_path is also not None if DB expects it
         final_txt_path_for_db = txt_path_for_db
         if final_txt_path_for_db is None and final_cv_path_for_db is not None and ".txt" in final_cv_path_for_db:
             # If cv_path ended up being the txt_path, txt_path can be the same.
@@ -477,55 +457,87 @@ class CVProcessor:
         elif final_txt_path_for_db is None:
             final_txt_path_for_db = f"MISSING_TXT_PATH_FOR_{source_reference.replace('.', '_')}"
 
-        applicant_data = {
-            'name': applicant_name,
-            # .get() handles missing keys, returns None
-            'email': personal_info.get('email'),
-            'phone': personal_info.get('phone'),
-            'cv_file_path': final_cv_path_for_db,
+        # If no applicant_id is provided, create a random applicant or use a default one
+        if applicant_id is None:
+            applicant_id = self._get_or_create_random_applicant()
+
+        # Create ApplicantDetail data
+        applicant_detail_data = {
+            'applicant_id': applicant_id,
+            'applicant_role': applicant_role,
+            'cv_path': final_cv_path_for_db,
             'txt_file_path': final_txt_path_for_db,
             'extracted_text': extracted_text,
             'summary': summary,
-            'skills': skills,
-            'highlights': highlights,
-            'accomplishments': accomplishments,
-            'work_experience': work_experience,
-            'education': education
-            # The 'category' is not directly in the Applicant model provided.
-            # If you add a 'category' column to your Applicant model, you can pass it here:
-            # 'category': category,
+            'skills': json.dumps(skills) if skills else None,
+            'highlights': json.dumps(highlights) if highlights else None,
+            'accomplishments': json.dumps(accomplishments) if accomplishments else None,
+            'work_experience': json.dumps(work_experience) if work_experience else None,
+            'education': json.dumps(education) if education else None,
         }
 
-        print(f"DEBUG: Final applicant data structure:")
-        print(f"  - Name: {applicant_data['name']}")
-        print(f"  - Email: {applicant_data['email']}")
-        print(f"  - Phone: {applicant_data['phone']}")
-        print(f"  - Skills count: {len(applicant_data['skills'])}")
-        print(f"  - Highlights count: {len(applicant_data['highlights'])}")
-        print(
-            f"  - Accomplishments count: {len(applicant_data['accomplishments'])}")
-        print(
-            f"  - Work experience count: {len(applicant_data['work_experience'])}")
-        print(f"  - Education count: {len(applicant_data['education'])}")
-        print(
-            f"  - Summary length: {len(applicant_data['summary']) if applicant_data['summary'] else 0}")
+        print(f"DEBUG: Final applicant detail data structure:")
+        print(f"  - Applicant ID: {applicant_detail_data['applicant_id']}")
+        print(f"  - Applicant Role: {applicant_detail_data['applicant_role']}")
+        print(f"  - Skills count: {len(skills)}")
+        print(f"  - Highlights count: {len(highlights)}")
+        print(f"  - Accomplishments count: {len(accomplishments)}")
+        print(f"  - Work experience count: {len(work_experience)}")
+        print(f"  - Education count: {len(education)}")
+        print(f"  - Summary length: {len(summary) if summary else 0}")
         print("DEBUG: Attempting to save to database...")
 
         db = SessionLocal()
         try:
-            # Applicant.from_dict will handle JSON conversion for complex fields
-            applicant = Applicant.from_dict(applicant_data)
-            db.add(applicant)
+            # Create ApplicantDetail record
+            applicant_detail = ApplicantDetail.from_dict(applicant_detail_data)
+            db.add(applicant_detail)
             db.commit()
-            db.refresh(applicant)
+            db.refresh(applicant_detail)
+
             print(
-                f"Successfully processed and saved: {source_reference}. DB ID: {applicant.id}")
-            return applicant.id
+                f"SUCCESS: Saved CV to database with detail_id: {applicant_detail.detail_id}")
+            return applicant_detail.detail_id
+
         except Exception as e:
+            print(f"ERROR: Failed to save CV to database: {e}")
             db.rollback()
-            print(
-                f"Error saving to database for {source_reference}: {e}. Data: {applicant_data}")
             return None
+        finally:
+            db.close()
+
+    def _get_or_create_random_applicant(self) -> int:
+        """Get or create a 'random' applicant profile for uploads without specified applicant"""
+        db = SessionLocal()
+        try:
+            # Try to find an existing "Random Applicant" profile
+            random_applicant = db.query(ApplicantProfile).filter(
+                ApplicantProfile.first_name == "Random",
+                ApplicantProfile.last_name == "Applicant"
+            ).first()
+
+            if random_applicant:
+                return random_applicant.applicant_id
+
+            # Create a new random applicant profile
+            random_applicant = ApplicantProfile(
+                first_name="Random",
+                last_name="Applicant",
+                address="Generated for CV uploads without specified applicant"
+            )
+
+            db.add(random_applicant)
+            db.commit()
+            db.refresh(random_applicant)
+
+            print(
+                f"Created new random applicant with ID: {random_applicant.applicant_id}")
+            return random_applicant.applicant_id
+
+        except Exception as e:
+            print(f"Error creating random applicant: {e}")
+            db.rollback()
+            # Return a default ID (1) as fallback            return 1
         finally:
             db.close()
 

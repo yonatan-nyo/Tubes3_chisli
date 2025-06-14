@@ -1,20 +1,18 @@
 # save without formatting for this file because if you format it, it will break the import system
-
 from dotenv import load_dotenv
 # Load environment variables from .env file FIRST - DO NOT MOVE THIS
 load_dotenv()
 
-
-from database.models.database import DATABASE_URL
-import flet as ft
-from database import init_db, SessionLocal, Applicant
-from database.models.init_database import get_schema_info
-from core.cv_processor import CVProcessor
-from core.search_engine import SearchEngine
-from gui.main_window import MainWindow
-import sys
-from pathlib import Path
 import os
+from pathlib import Path
+import sys
+from gui.main_window import MainWindow
+from core.search_engine import SearchEngine
+from core.cv_processor import CVProcessor
+from database.models.init_database import get_schema_info
+from database import init_db, SessionLocal, ApplicantProfile
+import flet as ft
+from database.models.database import DATABASE_URL
 
 
 
@@ -42,14 +40,15 @@ def main(page: ft.Page):
         f"DB_PASSWORD: {'*' * len(os.getenv('DB_PASSWORD', '')) if os.getenv('DB_PASSWORD') else 'Not set'}")
     print(f"database URL: {DATABASE_URL}")
 
-    try:
-        # Initialize database with automatic migration
+    try:        # Initialize database with automatic migration
         print("Initializing database with automatic migration...")
         if not init_db():
-            print("Normal initialization failed, trying with force recreation...")
-            if not init_db(force_recreate=True):
-                raise Exception(
-                    "Failed to initialize database even after recreation")
+            print("Database initialization failed!")
+            raise Exception("Failed to initialize database")
+
+        # Check for existing data
+        from database.models.init_database import check_existing_data
+        check_existing_data()
 
         # Show schema info for debugging
         print("\nCurrent database schema:")
@@ -57,28 +56,22 @@ def main(page: ft.Page):
         for table, info in schema_info.items():
             print(f"  {table}: {info['column_count']} columns")
             for col_name, col_type in info['columns'].items():
+                # Test database connection
                 print(f"    - {col_name}: {col_type}")
-
-        # Test database connection
         print("\nTesting database connection...")
         db = SessionLocal()
         try:
             # Test query
-            result = db.query(Applicant).first()
+            result = db.query(ApplicantProfile).first()
             print("Database connection successful")
             if result:
-                print(f"   Found existing applicant: {result.name}")
+                print(
+                    f"   Found existing applicant with ID: {result.applicant_id}")
             else:
                 print("   No applicants in database yet")
         except Exception as e:
             print(f"Database test failed: {e}")
-            # The auto-migration should have fixed this, but let's try once more
-            db.close()
-            print("Trying force recreation...")
-            init_db(force_recreate=True)
-            db = SessionLocal()
-            db.query(Applicant).first()
-            print("Database connection successful after recreation")
+            raise Exception(f"Database connection test failed: {e}")
         finally:
             db.close()
 

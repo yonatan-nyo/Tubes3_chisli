@@ -2,82 +2,123 @@ import flet as ft
 import os
 import subprocess
 import platform
-from typing import Callable, Dict, List
+from typing import Callable, Dict, List, Any
+from utils.type_safety import (
+    safe_get_str,
+    safe_get_list,
+    is_dict,
+    TypeSafetyError
+)
 
 
 class DetailView:
     """Detailed view for selected applicant"""
 
-    def __init__(self, page: ft.Page, on_back_callback: Callable):
-        self.page = page
-        self.on_back_callback = on_back_callback
+    def __init__(self, page: ft.Page, on_back_callback: Callable[[], None]):
+        self.page: ft.Page = page
+        self.on_back_callback: Callable[[], None] = on_back_callback
 
-    def build(self, applicant_data: Dict) -> ft.Control:
-        """Build detailed view for applicant"""
-        return ft.Column([
-            # Header with back button
-            ft.Container(
-                content=ft.Row([
-                    ft.ElevatedButton(
-                        "← Back to Results",
-                        on_click=lambda e: self.on_back_callback()
-                    ),
-                    ft.Container(expand=True),
-                    ft.Row([
+    def build(self, applicant_data: Dict[str, Any]) -> ft.Control:
+        """Build detailed view for applicant with type safety"""
+        try:
+            # Validate input data
+            if not is_dict(applicant_data):
+                raise TypeSafetyError(
+                    f"Expected dictionary, got {type(applicant_data)}")
+
+            return ft.Column([
+                # Header with back button
+                ft.Container(
+                    content=ft.Row([
                         ft.ElevatedButton(
-                            "View Full CV",
-                            on_click=lambda e: self._open_cv_file(
-                                applicant_data.get('cv_file_path', ''))
+                            "← Back to Results",
+                            on_click=lambda e: self.on_back_callback()
                         ),
-                        ft.ElevatedButton(
-                            "View Extracted Text",
-                            on_click=lambda e: self._open_txt_file(
-                                applicant_data.get('txt_file_path', ''))
+                        ft.Container(expand=True),
+                        ft.Row([
+                            ft.ElevatedButton(
+                                "View Full CV",
+                                on_click=lambda e: self._open_cv_file(
+                                    safe_get_str(applicant_data, 'cv_file_path', ''))
+                            ),
+                            ft.ElevatedButton(
+                                "View Extracted Text",
+                                on_click=lambda e: self._open_txt_file(
+                                    safe_get_str(applicant_data, 'txt_file_path', ''))
+                            )
+                        ], spacing=10)
+                    ]),
+                    padding=20,
+                    bgcolor=ft.Colors.BLUE_50,
+                    border_radius=10,
+                    margin=ft.Margin(0, 0, 0, 20)),
+
+                # Main content - Vertical layout with scrolling
+                ft.Container(
+                    content=ft.Column([
+                        # Personal info and summary section
+                        ft.Container(
+                            content=self._build_personal_section(
+                                applicant_data),
+                            padding=20,
+                            border=ft.border.all(1, ft.Colors.GREY_300),
+                            border_radius=10,
+                            margin=ft.Margin(0, 0, 0, 20)
+                        ),
+
+                        # Skills, experience, education section
+                        ft.Container(
+                            content=self._build_details_section(
+                                applicant_data),
+                            padding=20,
+                            border=ft.border.all(1, ft.Colors.GREY_300),
+                            border_radius=10
                         )
-                    ], spacing=10)
-                ]),
-                padding=20,
-                bgcolor=ft.Colors.BLUE_50,
-                border_radius=10,
-                margin=ft.Margin(0, 0, 0, 20)
-            ),            # Main content - Vertical layout with scrolling
+                    ], scroll=ft.ScrollMode.AUTO, expand=True),
+                    expand=True
+                )
+            ], expand=True, scroll=ft.ScrollMode.AUTO)
+        except Exception as e:
+            print(f"Error building detail view: {e}")
+            return self._build_error_view(str(e))
+
+    def _build_error_view(self, error_message: str) -> ft.Control:
+        """Build error view"""
+        return ft.Column([
             ft.Container(
                 content=ft.Column([
-                    # Personal info and summary section
-                    ft.Container(
-                        content=self._build_personal_section(applicant_data),
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
-                        border_radius=10,
-                        margin=ft.Margin(0, 0, 0, 20)
-                    ),
-
-                    # Skills, experience, education section
-                    ft.Container(
-                        content=self._build_details_section(applicant_data),
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
-                        border_radius=10
+                    ft.Icon(ft.Icons.ERROR, size=60, color=ft.Colors.RED_400),
+                    ft.Text("Error Loading Detail View",
+                            size=24, weight=ft.FontWeight.BOLD),
+                    ft.Text(f"Error: {error_message}",
+                            size=16, color=ft.Colors.RED_600),
+                    ft.Container(height=20),
+                    ft.ElevatedButton(
+                        "Go Back",
+                        on_click=lambda e: self.on_back_callback(),
+                        bgcolor=ft.Colors.BLUE_600,
+                        color=ft.Colors.WHITE
                     )
-                ], scroll=ft.ScrollMode.AUTO, expand=True),
-                expand=True
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=10),
+                padding=50,
+                alignment=ft.alignment.center
             )
-        ], expand=True, scroll=ft.ScrollMode.AUTO)
+        ], expand=True)
 
-    def _build_personal_section(self, applicant_data: Dict) -> ft.Control:
-        """Build personal information section"""
+    def _build_personal_section(self, applicant_data: Dict[str, Any]) -> ft.Control:
+        """Build personal information section with type safety"""
         return ft.Column([
             # Profile header
             ft.Container(
                 content=ft.Column([
                     ft.Text(
-                        applicant_data.get('name', 'Unknown'),
+                        safe_get_str(applicant_data, 'name', 'Unknown'),
                         size=20,
                         weight=ft.FontWeight.BOLD,
                         text_align=ft.TextAlign.CENTER
                     ),
                     ft.Text(
-                        f"ID: {applicant_data.get('id', 'N/A')}",
+                        f"ID: {safe_get_str(applicant_data, 'id', 'N/A')}",
                         size=12,
                         color=ft.Colors.GREY_600,
                         text_align=ft.TextAlign.CENTER
@@ -90,48 +131,57 @@ class DetailView:
             ),
 
             # Contact information with file paths
-            self._build_info_card("Contact Information", [
-                ("Email", applicant_data.get('email', 'Not provided')),
-                ("Phone", applicant_data.get('phone', 'Not provided')),
-                ("CV Uploaded", applicant_data.get('created_at', 'Unknown')),
-                ("PDF File", os.path.basename(
-                    applicant_data.get('cv_file_path', 'N/A'))),
-                ("TXT File", os.path.basename(
-                    applicant_data.get('txt_file_path', 'N/A')))
+            self._build_info_card("Personal Information", [
+                ("Phone", safe_get_str(applicant_data, 'phone', 'Not provided')),
+                ("Address", safe_get_str(applicant_data, 'address', 'Not provided')),
+                ("Date of Birth", safe_get_str(
+                    applicant_data, 'date_of_birth', 'Not provided')),
+                ("Role", safe_get_str(applicant_data,
+                 'applicant_role', 'Not specified')),
+                ("CV Uploaded", safe_get_str(applicant_data, 'created_at', 'Unknown')),
+                ("PDF File", os.path.basename(safe_get_str(
+                    applicant_data, 'cv_file_path', 'N/A'))),
+                ("TXT File", os.path.basename(safe_get_str(
+                    applicant_data, 'txt_file_path', 'N/A')))
             ]),
 
             ft.Container(height=20),
 
             # Summary section
-            self._build_summary_card(applicant_data.get('summary', ''))
+            self._build_summary_card(
+                safe_get_str(applicant_data, 'summary', ''))
         ], spacing=0)
 
-    def _build_details_section(self, applicant_data: Dict) -> ft.Control:
-        """Build details section with skills, highlights, accomplishments, experience, education"""
+    def _build_details_section(self, applicant_data: Dict[str, Any]) -> ft.Control:
+        """Build details section with skills, highlights, accomplishments, experience, education using type safety"""
         return ft.Column([
             # Skills section
-            self._build_skills_section(applicant_data.get('skills', [])),
+            self._build_skills_section(
+                safe_get_list(applicant_data, 'skills', [])),
 
             ft.Container(height=20),
 
             # Highlights section
             self._build_highlights_section(
-                applicant_data.get('highlights', [])),
+                safe_get_list(applicant_data, 'highlights', [])),
 
             ft.Container(height=20),
 
             # Accomplishments section
             self._build_accomplishments_section(
-                applicant_data.get('accomplishments', [])),
+                safe_get_list(applicant_data, 'accomplishments', [])),
 
             ft.Container(height=20),
 
             # Work experience section
             self._build_work_experience_section(
-                applicant_data.get('work_experience', [])),
+                safe_get_list(applicant_data, 'work_experience', [])),
 
-            ft.Container(height=20),            # Education section
-            self._build_education_section(applicant_data.get('education', []))
+            ft.Container(height=20),
+
+            # Education section
+            self._build_education_section(
+                safe_get_list(applicant_data, 'education', []))
         ], scroll=ft.ScrollMode.AUTO)
 
     def _build_info_card(self, title: str, info_items: List[tuple]) -> ft.Control:

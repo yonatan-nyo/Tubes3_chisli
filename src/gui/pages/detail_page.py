@@ -1,40 +1,84 @@
 import flet as ft
-from typing import Callable
-from database import Applicant
+from typing import Callable, Dict, Any, Optional
+from sqlalchemy.orm import Session
+from database.models.applicant import ApplicantProfile, ApplicantDetail
 from gui.components.detail_view import DetailView
+from utils.type_safety import (
+    validate_applicant_data,
+    safe_get_str,
+    safe_get_list,
+    format_datetime_safe,
+    TypeSafetyError
+)
 
 
 class DetailPage:
-    """Applicant detail page"""
+    """Application detail page"""
 
-    def __init__(self, page: ft.Page, session_factory, on_back: Callable):
-        self.page = page
-        self.session_factory = session_factory
-        self.on_back = on_back
-
+    def __init__(self, page: ft.Page, session_factory: Callable[[], Session], on_back: Callable[[], None]):
+        self.page: ft.Page = page
+        self.session_factory: Callable[[], Session] = session_factory
         # Initialize detail view component
-        self.detail_view = DetailView(self.page, self.on_back)
+        self.on_back: Callable[[], None] = on_back
+        self.detail_view: DetailView = DetailView(self.page, self.on_back)
+        self.current_detail_id: Optional[int] = None
 
-        # Current applicant
-        self.current_applicant_id = None
-
-    def build(self, applicant_id: int) -> ft.Control:
-        """Build the detail page for a specific applicant"""
-        self.current_applicant_id = applicant_id
+    def build(self, detail_id: int) -> ft.Control:
+        """Build the detail page for a specific application"""
+        self.current_detail_id = detail_id
 
         try:
-            db = self.session_factory()
+            db: Session = self.session_factory()
             try:
-                applicant = db.query(Applicant).filter(
-                    Applicant.id == applicant_id).first()
-                if applicant:
-                    applicant_data = applicant.to_dict()
-                    return self.detail_view.build(applicant_data)
+                applicant_detail: Optional[ApplicantDetail] = db.query(ApplicantDetail).filter(
+                    ApplicantDetail.detail_id == detail_id).first()
+
+                if applicant_detail and applicant_detail.profile:
+                    # Combine detail and profile data in the expected format
+                    profile: ApplicantProfile = applicant_detail.profile
+                    full_name: str = f"{profile.first_name or ''} {profile.last_name or ''}".strip(
+                    )
+                    if not full_name:
+                        full_name = f"Applicant #{profile.applicant_id}"
+
+                    # Parse JSON fields safely using the to_dict method
+                    detail_dict: Dict[str, Any] = applicant_detail.to_dict()
+
+                    # Create combined data dict using type-safe functions
+                    applicant_data: Dict[str, Any] = {
+                        'id': applicant_detail.detail_id,
+                        'name': full_name,
+                        'email': 'Not provided',  # Email removed from new schema
+                        'phone': safe_get_str({'phone': profile.phone_number}, 'phone', 'Not provided'),
+                        'cv_file_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
+                        'txt_file_path': safe_get_str({'path': applicant_detail.txt_file_path}, 'path', ''),
+                        'extracted_text': safe_get_str({'text': applicant_detail.extracted_text}, 'text', ''),
+                        'summary': safe_get_str({'summary': applicant_detail.summary}, 'summary', ''),
+                        'skills': safe_get_list(detail_dict, 'skills', []),
+                        'work_experience': safe_get_list(detail_dict, 'work_experience', []),
+                        'education': safe_get_list(detail_dict, 'education', []),
+                        'highlights': safe_get_list(detail_dict, 'highlights', []),
+                        'accomplishments': safe_get_list(detail_dict, 'accomplishments', []),
+                        'created_at': format_datetime_safe(applicant_detail.created_at, "%Y-%m-%d %H:%M:%S", 'Unknown'),
+                        'applicant_role': safe_get_str({'role': applicant_detail.applicant_role}, 'role', 'Not specified'),
+                        'address': safe_get_str({'address': profile.address}, 'address', 'Not provided'),
+                        'date_of_birth': format_datetime_safe(profile.date_of_birth, "%Y-%m-%d", 'Not provided')
+                    }
+
+                    # Validate the data before passing to detail view
+                    try:
+                        validated_data = validate_applicant_data(
+                            applicant_data)
+                        return self.detail_view.build(validated_data.to_dict())
+                    except TypeSafetyError as e:
+                        print(f"Type safety error in applicant data: {e}")
+                        return self._build_error(f"Data validation error: {str(e)}")
                 else:
                     return self._build_not_found()
             finally:
                 db.close()
         except Exception as e:
+            print(f"Error in DetailPage.build: {e}")
             return self._build_error(str(e))
 
     def _build_not_found(self) -> ft.Control:
@@ -42,11 +86,11 @@ class DetailPage:
         return ft.Column([
             ft.Container(
                 content=ft.Column([
-                    ft.Icon(ft.Icons.PERSON_OFF, size=60,
+                    ft.Icon(ft.Icons.DESCRIPTION_OUTLINED, size=60,
                             color=ft.Colors.GREY_400),
-                    ft.Text("Applicant Not Found", size=24,
+                    ft.Text("Application Not Found", size=24,
                             weight=ft.FontWeight.BOLD),
-                    ft.Text("The requested applicant could not be found.",
+                    ft.Text("The requested application could not be found.",
                             size=16, color=ft.Colors.GREY_600),
                     ft.Container(height=20),
                     ft.ElevatedButton(
