@@ -75,12 +75,20 @@ class ResultsSection:
 
             results = safe_get_list(search_results, 'results', [])
 
-            # Update info text
+           # Update info text
             if results:
                 algorithm = safe_get_str(
                     search_results, 'algorithm_used', 'Unknown')
                 total_time = safe_get_float(search_results, 'total_time', 0.0)
-                self.results_info.value = f"{len(results)} results • {algorithm} • {total_time:.3f}s"
+                exact_time = safe_get_float(
+                    search_results, 'exact_match_time', 0.0)
+                fuzzy_time = safe_get_float(
+                    search_results, 'fuzzy_match_time', 0.0)
+                self.results_info.value = (
+                    f"{len(results)} results • {algorithm} • "
+                    f"Total: {total_time:.3f}s "
+                    f"(Exact: {exact_time:.3f}s, Fuzzy: {fuzzy_time:.3f}s)"
+                )
             else:
                 self.results_info.value = "No results found"
 

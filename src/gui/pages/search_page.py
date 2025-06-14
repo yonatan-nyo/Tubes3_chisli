@@ -70,22 +70,6 @@ class SearchPage:
         self.search_results = results
         self.results_section.update_results(results)
 
-        # Show search timing info
-        timing_message = f"Search completed in {results['total_time']:.3f}s"
-        if results['exact_match_time'] > 0:
-            timing_message += f" (Exact: {results['exact_match_time']:.3f}s"
-        if results['fuzzy_match_time'] > 0:
-            timing_message += f", Fuzzy: {results['fuzzy_match_time']:.3f}s)"
-        else:
-            timing_message += ")"
-
-        self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(timing_message),
-            bgcolor=ft.Colors.BLUE_100
-        )
-        self.page.snack_bar.open = True
-        self.page.update()
-
     def get_search_results(self) -> Dict:
         """Get current search results"""
         return self.search_results
