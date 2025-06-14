@@ -61,6 +61,9 @@ class MainWindow:
         if not self.components_initialized:
             return self._build_error_view()
 
+        # Initialize content with the current page
+        self._update_content()
+
         return ft.Row([
             # Sidebar
             self._build_sidebar(),
