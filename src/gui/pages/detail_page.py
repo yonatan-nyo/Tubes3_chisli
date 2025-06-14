@@ -39,22 +39,26 @@ class DetailPage:
                 if applicant_detail and applicant_detail.profile:
                     # Combine detail and profile data in the expected format
                     profile: ApplicantProfile = applicant_detail.profile
-                    full_name: str = f"{profile.first_name or ''} {profile.last_name or ''}".strip(
+
+                    # Get decrypted profile data for display
+                    display_profile = profile.get_display_data()
+
+                    full_name: str = f"{display_profile.first_name or ''} {display_profile.last_name or ''}".strip(
                     )
                     if not full_name:
-                        full_name = f"Applicant #{profile.applicant_id}"
+                        full_name = f"Applicant #{display_profile.applicant_id}"
 
-                    # Parse JSON fields safely using the to_dict method
+                    # Parse JSON fields safely using the decrypted data
                     # Create combined data dict using type-safe functions
                     applicant_data: Dict[str, Any] = {
                         'detail_id': applicant_detail.detail_id,
                         'applicant_id': applicant_detail.applicant_id,
                         'name': full_name,
                         'email': 'Not provided',  # Email removed from new schema
-                        'phone': safe_get_str({'phone': profile.phone_number}, 'phone', 'Not provided'),                        'cv_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
+                        'phone': safe_get_str({'phone': display_profile.phone_number}, 'phone', 'Not provided'),                        'cv_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
                         'applicant_role': safe_get_str({'role': applicant_detail.applicant_role}, 'role', 'Not specified'),
-                        'address': safe_get_str({'address': profile.address}, 'address', 'Not provided'),
-                        'date_of_birth': format_datetime_safe(profile.date_of_birth, "%Y-%m-%d", 'Not provided')}
+                        'address': safe_get_str({'address': display_profile.address}, 'address', 'Not provided'),
+                        'date_of_birth': format_datetime_safe(display_profile.date_of_birth, "%Y-%m-%d", 'Not provided')}
 
                     # Compute CV fields on demand using search engine
                     detail_with_computed = self.search_engine.get_applicant_details(

@@ -1,8 +1,8 @@
-from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey
+from sqlalchemy import Column, Integer, String, Text, Date, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from typing import Dict
-import json
 from .database import Base
+from utils.encryption import encryption
 
 
 class ApplicantProfile(Base):
@@ -14,19 +14,65 @@ class ApplicantProfile(Base):
     date_of_birth = Column(Date, nullable=True)
     address = Column(String(255), nullable=True)
     phone_number = Column(String(20), nullable=True)
+    is_encrypted = Column(Boolean, default=False,
+                          nullable=False)  # New encryption flag
 
     # Relationship to applicant details
     details = relationship("ApplicantDetail", back_populates="profile")
 
+    def encrypt_data(self) -> 'ApplicantProfile':
+        """Return a new instance with encrypted data"""
+        if self.is_encrypted:
+            return self  # Already encrypted
+
+        encrypted_profile = ApplicantProfile(
+            applicant_id=self.applicant_id,
+            first_name=encryption.encrypt(self.first_name or ""),
+            last_name=encryption.encrypt(self.last_name or ""),
+            date_of_birth=self.date_of_birth,  # Don't encrypt dates
+            address=encryption.encrypt(self.address or ""),
+            phone_number=encryption.encrypt(self.phone_number or ""),
+            is_encrypted=True
+        )
+        return encrypted_profile
+
+    def decrypt_data(self) -> 'ApplicantProfile':
+        """Return a new instance with decrypted data"""
+        if not self.is_encrypted:
+            return self  # Already decrypted
+
+        decrypted_profile = ApplicantProfile(
+            applicant_id=self.applicant_id,
+            first_name=encryption.decrypt(self.first_name or ""),
+            last_name=encryption.decrypt(self.last_name or ""),
+            date_of_birth=self.date_of_birth,
+            address=encryption.decrypt(self.address or ""),
+            phone_number=encryption.decrypt(self.phone_number or ""),
+            is_encrypted=False
+        )
+        return decrypted_profile
+
+    def get_display_data(self) -> 'ApplicantProfile':
+        """Get data ready for display (decrypted if needed)"""
+        return self.decrypt_data() if self.is_encrypted else self
+
     def to_dict(self) -> Dict:
-        """Convert model instance to dictionary"""
+        """
+        Convert model instance to dictionary.
+        Ensures that the data is decrypted before being sent out.
+        """
+        # Get the display-ready (decrypted) version of the profile first.
+        display_profile = self.get_display_data()
+
         return {
-            'applicant_id': self.applicant_id,
-            'first_name': self.first_name,
-            'last_name': self.last_name,
-            'date_of_birth': self.date_of_birth,
-            'address': self.address,
-            'phone_number': self.phone_number
+            'applicant_id': display_profile.applicant_id,
+            'first_name': display_profile.first_name,
+            'last_name': display_profile.last_name,
+            'date_of_birth': display_profile.date_of_birth,
+            'address': display_profile.address,
+            'phone_number': display_profile.phone_number,
+            # We report the original encryption state of the object in the DB.
+            'is_encrypted': self.is_encrypted
         }
 
     @classmethod
@@ -37,7 +83,8 @@ class ApplicantProfile(Base):
             last_name=data.get('last_name'),
             date_of_birth=data.get('date_of_birth'),
             address=data.get('address'),
-            phone_number=data.get('phone_number')
+            phone_number=data.get('phone_number'),
+            is_encrypted=False
         )
 
     def __repr__(self):

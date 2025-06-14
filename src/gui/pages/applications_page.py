@@ -77,8 +77,7 @@ class ApplicationsPage:
                 ], expand=True),
                 padding=30,
                 expand=True
-            )
-        ], expand=True, scroll=ft.ScrollMode.AUTO)
+            )], expand=True, scroll=ft.ScrollMode.AUTO)
 
     def _build_applicant_selector(self) -> ft.Control:
         """Build applicant selection dropdown"""
@@ -89,11 +88,15 @@ class ApplicationsPage:
         ]
 
         for profile in self.applicant_profiles:
-            full_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip()
+            # Get decrypted data for display
+            display_profile = profile.get_display_data()
+            full_name = f"{display_profile.first_name or ''} {display_profile.last_name or ''}".strip(
+            )
             if not full_name:
-                full_name = f"Applicant #{profile.applicant_id}"
+                full_name = f"Applicant #{display_profile.applicant_id}"
             options.append(
                 ft.dropdown.Option(
+                    # Use original profile for ID
                     key=str(profile.applicant_id),
                     text=full_name
                 )
@@ -160,12 +163,14 @@ class ApplicationsPage:
             )
 
     def _build_application_card(self, application: ApplicantDetail) -> ft.Control:
-        """Build a card for an application"""
-        # Get applicant name
+        """Build a card for an application"""        # Get applicant name
         applicant_name = "Unknown"
         if application.profile:
-            full_name = f"{application.profile.first_name or ''} {application.profile.last_name or ''}".strip()
-            applicant_name = full_name if full_name else f"Applicant #{application.profile.applicant_id}"
+            # Get decrypted data for display
+            display_profile = application.profile.get_display_data()
+            full_name = f"{display_profile.first_name or ''} {display_profile.last_name or ''}".strip(
+            )
+            applicant_name = full_name if full_name else f"Applicant #{display_profile.applicant_id}"
 
         return ft.Card(
             content=ft.Container(
@@ -249,12 +254,15 @@ class ApplicationsPage:
             ]
 
             for profile in self.applicant_profiles:
-                full_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip(
+                # Get decrypted data for display
+                display_profile = profile.get_display_data()
+                full_name = f"{display_profile.first_name or ''} {display_profile.last_name or ''}".strip(
                 )
                 if not full_name:
-                    full_name = f"Applicant #{profile.applicant_id}"
+                    full_name = f"Applicant #{display_profile.applicant_id}"
                 options.append(
                     ft.dropdown.Option(
+                        # Use original profile for ID
                         key=str(profile.applicant_id),
                         text=full_name
                     )
@@ -282,12 +290,15 @@ class ApplicationsPage:
                 ]
 
                 for profile in self.applicant_profiles:
-                    full_name = f"{profile.first_name or ''} {profile.last_name or ''}".strip(
+                    # Get decrypted data for display
+                    display_profile = profile.get_display_data()
+                    full_name = f"{display_profile.first_name or ''} {display_profile.last_name or ''}".strip(
                     )
                     if not full_name:
-                        full_name = f"Applicant #{profile.applicant_id}"
+                        full_name = f"Applicant #{display_profile.applicant_id}"
                     options.append(
                         ft.dropdown.Option(
+                            # Use original profile for ID
                             key=str(profile.applicant_id),
                             text=full_name
                         )

@@ -23,7 +23,9 @@ from .type_safety import (
     assert_type,
     assert_dict_has_keys
 )
-
+from .encryption import (
+    encryption,
+)
 __all__ = [
     "ApplicantDataSchema",
     "SearchResultSchema",
@@ -46,5 +48,6 @@ __all__ = [
     "parse_json_safe",
     "TypeSafetyError",
     "assert_type",
-    "assert_dict_has_keys"
+    "assert_dict_has_keys",
+    "encryption",
 ]

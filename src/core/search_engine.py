@@ -41,8 +41,8 @@ class SearchEngine:
             keywords = ensure_list(keywords)
             algorithm = ensure_string(algorithm, "KMP")
             max_results = max(1, int(max_results))
-            # Get all applicant details from database (iterate over applications as requested)
             fuzzy_threshold = max(0.0, min(1.0, float(fuzzy_threshold)))
+            # Get all applicant details from database (iterate over applications as requested)
             db = SessionLocal()
             try:
                 from sqlalchemy.orm import joinedload

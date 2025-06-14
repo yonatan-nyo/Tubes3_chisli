@@ -166,23 +166,25 @@ class ApplicantsPage:
                     ft.Icon(ft.Icons.ERROR, size=64, color=ft.Colors.RED_400),
                     ft.Text("Error loading applicants",
                             size=16, color=ft.Colors.RED_600),
-                    ft.Text(str(e), size=12, color=ft.Colors.GREY_600),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Text(str(e), size=12, color=ft.Colors.GREY_600),], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 alignment=ft.alignment.center,
                 expand=True
             )
 
     def _create_applicant_card(self, applicant: ApplicantProfile) -> ft.Control:
         """Create a card for an applicant"""
-        full_name = f"{applicant.first_name or ''} {applicant.last_name or ''}".strip()
+        # Get decrypted data for display
+        display_applicant = applicant.get_display_data()
+
+        full_name = f"{display_applicant.first_name or ''} {display_applicant.last_name or ''}".strip()
         if not full_name:
-            full_name = f"Applicant #{applicant.applicant_id}"
+            full_name = f"Applicant #{display_applicant.applicant_id}"
 
         # Build address display
         address_display = []
-        if applicant.address:
+        if display_applicant.address:
             address_display.append(
-                ft.Text(applicant.address, size=12,
+                ft.Text(display_applicant.address, size=12,
                         color=ft.Colors.GREY_600, max_lines=2)
             )
 
@@ -193,13 +195,13 @@ class ApplicantsPage:
                         ft.Column([
                             ft.Text(full_name, size=16,
                                     weight=ft.FontWeight.BOLD),
-                            ft.Text(applicant.phone_number or "No phone",
+                            ft.Text(display_applicant.phone_number or "No phone",
                                     size=14, color=ft.Colors.GREY_600),
                         ], expand=True),
                         ft.Column([
-                            ft.Text(f"ID: {applicant.applicant_id}",
+                            ft.Text(f"ID: {display_applicant.applicant_id}",
                                     size=12, color=ft.Colors.GREY_500),
-                            ft.Text(applicant.date_of_birth.strftime("%Y-%m-%d") if applicant.date_of_birth else "No DOB",
+                            ft.Text(display_applicant.date_of_birth.strftime("%Y-%m-%d") if display_applicant.date_of_birth else "No DOB",
                                     size=12, color=ft.Colors.GREY_500),
                         ], horizontal_alignment=ft.CrossAxisAlignment.END),
                         # Address display (only if address exists)
@@ -229,11 +231,10 @@ class ApplicantsPage:
                 except ValueError:
                     self._show_error(
                         "Invalid date format. Please select a valid date")
-                    return
-
-            # Create new applicant
+                    return            # Create new applicant
             db = self.session_factory()
             try:
+                # Create applicant with plain data first
                 new_applicant = ApplicantProfile(
                     first_name=self.first_name_field.value.strip(
                     ) if self.first_name_field.value else None,
@@ -243,15 +244,17 @@ class ApplicantsPage:
                     address=self.address_field.value.strip() if self.address_field.value else None,
                     phone_number=self.phone_number_field.value.strip(
                     ) if self.phone_number_field.value else None,
-                )
-
-                db.add(new_applicant)
+                )                # Encrypt the sensitive data before saving to database
+                encrypted_applicant = new_applicant.encrypt_data()
+                db.add(encrypted_applicant)
                 db.commit()
+                db.refresh(encrypted_applicant)
 
+                # Use the original (non-encrypted) data for display purposes
                 full_name = f"{new_applicant.first_name or ''} {new_applicant.last_name or ''}".strip(
                 )
                 self._show_success(
-                    f"Applicant '{full_name}' created successfully!")
+                    f"Applicant '{full_name}' created successfully! (Data encrypted)")
 
                 # Clear form
                 self._clear_form()
@@ -261,7 +264,7 @@ class ApplicantsPage:
 
                 if self.on_applicant_created_callback:
                     self.on_applicant_created_callback(
-                        True, f"Applicant created with ID: {new_applicant.applicant_id}")
+                        True, f"Applicant created with ID: {encrypted_applicant.applicant_id}")
 
             finally:
                 db.close()

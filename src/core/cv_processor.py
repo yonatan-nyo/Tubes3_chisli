@@ -465,13 +465,15 @@ class CVProcessor:
                     address="System generated profile for CV uploads"
                 )
 
-                db.add(default_applicant)
+                # Encrypt the default applicant data before saving
+                encrypted_default = default_applicant.encrypt_data()
+                db.add(encrypted_default)
                 db.commit()
-                db.refresh(default_applicant)
+                db.refresh(encrypted_default)
 
                 print(
-                    f"Created default applicant with ID: {default_applicant.applicant_id}")
-                return default_applicant.applicant_id
+                    f"Created encrypted default applicant with ID: {encrypted_default.applicant_id}")
+                return encrypted_default.applicant_id
 
         except Exception as e:
             print(f"Error getting random applicant: {e}")
