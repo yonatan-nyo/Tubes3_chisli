@@ -1,43 +1,51 @@
 import flet as ft
-from typing import Dict
-from gui.components.upload_section import UploadSection
-from gui.components.search_section import SearchSection
-from gui.components.results_section import ResultsSection
-from gui.components.detail_view import DetailView
+from typing import Dict, List
+from gui.pages.applicants_page import ApplicantsPage
+from gui.pages.search_page import SearchPage
+from gui.pages.detail_page import DetailPage
 from database import Applicant
 
+
 class MainWindow:
-    """Main window for CV matching application"""
-    
+    """Main window for CV matching application with multipage navigation"""
+
     def __init__(self, page: ft.Page, session_factory, cv_processor, search_engine):
         self.page = page
-        self.session_factory = session_factory  # SQLAlchemy SessionLocal
+        self.session_factory = session_factory
         self.cv_processor = cv_processor
-        self.search_engine = search_engine
-        
-        # Initialize components
+        self.search_engine = search_engine        # Initialize page classes
         try:
-            self.upload_section = UploadSection(self.page, self.cv_processor, self.on_cv_uploaded)
-            self.search_section = SearchSection(self.page, self.search_engine, self.on_search_performed)
-            self.results_section = ResultsSection(self.page, self.on_result_selected)
-            self.detail_view = DetailView(self.page, self.on_back_to_results)
+            self.applicants_page = ApplicantsPage(
+                self.page, self.session_factory, self.cv_processor, self._view_applicant_detail
+            )
+            self.search_page = SearchPage(
+                self.page, self.search_engine, self.on_result_selected
+            )
+            self.detail_page = DetailPage(
+                self.page, self.session_factory, self.on_back_to_results
+            )
+
+            # Set upload callback for applicants page
+            self.applicants_page.set_upload_callback(self.on_cv_uploaded)
+
         except Exception as e:
-            print(f"Error initializing components: {e}")
-            # Create fallback UI if components fail
+            print(f"Error initializing page components: {e}")
             self.components_initialized = False
         else:
             self.components_initialized = True
-        
-        # Current view state
-        self.current_view = "main"
+
+        # Navigation state
+        self.current_page = "applicants"
+        self.current_view = "main"  # main, detail
         self.search_results = []
-        
-        # Main container
-        self.main_container = ft.Container()
-        
+        self.selected_applicant_id = None
+        # UI components
+        self.content_area = ft.Container(expand=True)
+        self.sidebar_container = ft.Container()
+
         # Check database connection on startup
         self._check_database_connection()
-    
+
     def _check_database_connection(self):
         """Check if database connection is working"""
         try:
@@ -49,88 +57,110 @@ class MainWindow:
             print(f"Database connection failed: {e}")
 
     def build(self) -> ft.Control:
-        """Build the main window interface"""
+        """Build the main window interface with sidebar navigation"""
         if not self.components_initialized:
             return self._build_error_view()
-        return self._build_main_view()
-    
-    def _build_error_view(self) -> ft.Control:
-        """Build error view when components fail to initialize"""
-        return ft.Column([
+
+        return ft.Row([
+            # Sidebar
+            self._build_sidebar(),
+            # Main content area
             ft.Container(
-                content=ft.Column([
-                    ft.Text("Application Error", size=24, weight=ft.FontWeight.BOLD),
-                    ft.Text("Failed to initialize application components.", size=16),
-                    ft.Text("Please check the console for error details.", size=14, color=ft.Colors.GREY_600),
-                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=50,
-                alignment=ft.alignment.center
+                content=self.content_area,
+                expand=True,
+                padding=0
             )
         ], expand=True)
-    
-    def _build_main_view(self) -> ft.Control:
-        """Build the main view with upload and search"""
-        return ft.Column([
-            # Header
-            ft.Container(
-                content=ft.Row([
-                    ft.Text("CV Matching System", size=24, weight=ft.FontWeight.BOLD),
-                ], alignment=ft.MainAxisAlignment.CENTER),
-                padding=20,
-                bgcolor=ft.Colors.BLUE_50,
-                border_radius=10,
-                margin=ft.Margin(0, 0, 0, 20)
-            ),
-            
-            # Main content - Make scrollable
-            ft.Container(
-                content=ft.Row([
-                    # Left side - Upload section
-                    ft.Container(
-                        content=ft.Column([
-                            self.upload_section.build()
-                        ], scroll=ft.ScrollMode.AUTO),
-                        width=400,
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
-                        border_radius=10,
-                        height=600  # Fixed height to enable scrolling
-                    ),
-                    
-                    # Right side - Search section and results
-                    ft.Container(
-                        content=ft.Column([
-                            self.search_section.build(),
-                            ft.Divider(height=20),
-                            self.results_section.build()
-                        ], scroll=ft.ScrollMode.AUTO),
-                        expand=True,
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
-                        border_radius=10,
-                        margin=ft.Margin(20, 0, 0, 0),
-                        height=600  # Fixed height to enable scrolling
-                    )
-                ], expand=True, scroll=ft.ScrollMode.AUTO),
-                expand=True
-            ),
-            
-            # Footer
-            ft.Container(
-                content=ft.Text(
-                    "CV Matching System - Tubes 3 Strategi dan Algoritma",
-                    size=12,
-                    color=ft.Colors.GREY_600
+
+    def _build_sidebar(self) -> ft.Control:
+        """Build the navigation sidebar"""
+        return ft.Container(
+            content=ft.Column([
+                # Header
+                ft.Container(
+                    content=ft.Column([
+                        ft.Text("CV Matching", size=20,
+                                weight=ft.FontWeight.BOLD, color=ft.Colors.WHITE),
+                        ft.Text("System", size=16, color=ft.Colors.WHITE70),
+                    ], spacing=5),
+                    padding=ft.Padding(20, 30, 20, 20),
+                    bgcolor=ft.Colors.BLUE_800,
                 ),
-                alignment=ft.alignment.center,
-                padding=10
-            )
-        ], expand=True, scroll=ft.ScrollMode.AUTO)
-    
-    def _build_detail_view(self, applicant_data: Dict) -> ft.Control:
-        """Build detailed view for selected applicant"""
-        return self.detail_view.build(applicant_data)
-    
+
+                # Navigation items
+                ft.Container(
+                    content=ft.Column([
+                        self._create_nav_item(
+                            "Applicants", ft.Icons.PEOPLE, "applicants"),
+                        self._create_nav_item(
+                            "Search", ft.Icons.SEARCH, "search"),
+                    ], spacing=5),
+                    padding=ft.Padding(10, 20, 10, 20),
+                ),
+
+                # Footer
+                ft.Container(expand=True),
+                ft.Container(
+                    content=ft.Text(
+                        "Tubes 3 - Stima",
+                        size=12,
+                        color=ft.Colors.GREY_600,
+                        text_align=ft.TextAlign.CENTER
+                    ),
+                    padding=20,
+                )
+            ], expand=True),
+            width=250,
+            bgcolor=ft.Colors.GREY_100,
+            border=ft.border.only(right=ft.BorderSide(1, ft.Colors.GREY_300))
+        )
+
+    def _create_nav_item(self, title: str, icon: str, page_key: str) -> ft.Control:
+        """Create a navigation item"""
+        is_selected = self.current_page == page_key
+
+        return ft.Container(
+            content=ft.Row([
+                ft.Icon(
+                    icon, color=ft.Colors.WHITE if is_selected else ft.Colors.GREY_700),
+                ft.Text(title, color=ft.Colors.WHITE if is_selected else ft.Colors.GREY_700,
+                        weight=ft.FontWeight.BOLD if is_selected else ft.FontWeight.NORMAL),
+            ], spacing=15),
+            padding=ft.Padding(15, 12, 15, 12),            bgcolor=ft.Colors.BLUE_600 if is_selected else ft.Colors.TRANSPARENT,            border_radius=8,
+            on_click=lambda e, page=page_key: self._navigate_to_page(page),
+            ink=True
+        )
+
+    def _navigate_to_page(self, page_key: str):
+        """Navigate to a specific page"""
+        if page_key == self.current_page:
+            return
+
+        self.current_page = page_key
+        self.current_view = "main"
+        self._update_content()
+        self.page.update()
+
+    def _update_content(self):
+        """Update the main content area based on current page and view"""
+        if self.current_view == "detail" and self.selected_applicant_id:
+            content = self.detail_page.build(self.selected_applicant_id)
+        elif self.current_page == "applicants":
+            content = self.applicants_page.build()
+        elif self.current_page == "search":
+            content = self.search_page.build()
+        else:
+            content = self.applicants_page.build()
+
+        self.content_area.content = content
+
+    def _view_applicant_detail(self, applicant_id: int):
+        """View applicant detail"""
+        self.selected_applicant_id = applicant_id
+        self.current_view = "detail"
+        self._update_content()
+        self.page.update()
+
     def on_cv_uploaded(self, success: bool, message: str):
         """Handle CV upload completion"""
         if success:
@@ -138,6 +168,9 @@ class MainWindow:
                 content=ft.Text(f"Success: {message}"),
                 bgcolor=ft.Colors.GREEN_100
             )
+            # Refresh applicants list
+            if self.current_page == "applicants":
+                self._update_content()
         else:
             self.page.snack_bar = ft.SnackBar(
                 content=ft.Text(f"Error: {message}"),
@@ -145,28 +178,12 @@ class MainWindow:
             )
         self.page.snack_bar.open = True
         self.page.update()
-    
+
     def on_search_performed(self, results: Dict):
-        """Handle search completion"""
-        self.search_results = results
-        self.results_section.update_results(results)
-        
-        # Show search timing info
-        timing_message = f"Search completed in {results['total_time']:.3f}s"
-        if results['exact_match_time'] > 0:
-            timing_message += f" (Exact: {results['exact_match_time']:.3f}s"
-        if results['fuzzy_match_time'] > 0:
-            timing_message += f", Fuzzy: {results['fuzzy_match_time']:.3f}s)"
-        else:
-            timing_message += ")"
-        
-        self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(timing_message),
-            bgcolor=ft.Colors.BLUE_100
-        )
-        self.page.snack_bar.open = True
-        self.page.update()
-        
+        """Handle search completion - delegated to search page"""
+        if hasattr(self, 'search_page'):
+            self.search_page.on_search_performed(results)
+
     # def on_result_selected(self, applicant_id: int):
     #     """Handle result selection"""
     #     try:
@@ -175,10 +192,10 @@ class MainWindow:
     #             applicant = db.query(Applicant).filter(Applicant.id == applicant_id).first()
     #             if applicant:
     #                 applicant_data = applicant.to_dict()  # Ensure this method exists and works
-                    
+
     #                 # Prepare the detail view content
     #                 detail_view_content = self.detail_view.build(applicant_data)
-                    
+
     #                 self.current_view = "detail"
     #                 self.page.clean()  # Clear all existing content from the page
     #                 self.page.add(detail_view_content)  # Add the new detail view
@@ -197,125 +214,36 @@ class MainWindow:
     #         self.page.snack_bar = ft.SnackBar(
     #             content=ft.Text(f"Error loading applicant details: {str(e)}"),
     #             bgcolor=ft.Colors.RED_100
-    #         )
-    #         self.page.snack_bar.open = True
+    #         )    #         self.page.snack_bar.open = True
     #         self.page.update()
     #         print(f"Error loading applicant details: {e}") # Keep console log
 
     def on_result_selected(self, applicant_id: int):
         """Handle result selection"""
-        try:
-            db = self.session_factory()
-            try:
-                applicant = db.query(Applicant).filter(Applicant.id == applicant_id).first()
-                if applicant:
-                    applicant_data = applicant.to_dict()
-
-                    # <--- COMPREHENSIVE DEBUGGING BLOCK FOR ALL FIELDS --->
-                    print("\n" + "="*25 + " DEBUG START " + "="*25)
-                    print(f"--- All Data for Applicant ID: {applicant_data.get('id')} ---")
-
-                    # --- Basic Information ---
-                    print("\n[-- Personal Info --]")
-                    print(f"  Name: {applicant_data.get('name')}")
-                    print(f"  Email: {applicant_data.get('email')}")
-                    print(f"  Phone: {applicant_data.get('phone')}")
-
-                    # --- File Paths and Timestamps ---
-                    print("\n[-- File & Time Info --]")
-                    print(f"  CV File Path: {applicant_data.get('cv_file_path')}")
-                    print(f"  TXT File Path: {applicant_data.get('txt_file_path')}")
-                    print(f"  Created At: {applicant_data.get('created_at')}")
-                    print(f"  Updated At: {applicant_data.get('updated_at')}")
-
-                    # --- Skills (List) ---
-                    print("\n[-- Skills --]")
-                    skills_list = applicant_data.get('skills', [])
-                    if skills_list:
-                        for i, skill in enumerate(skills_list):
-                            print(f"  - Skill #{i+1}: {skill}")
-                    else:
-                        print("  No skills listed.")
-
-                    # --- Work Experience (List of Dictionaries) ---
-                    print("\n[-- Work Experience --]")
-                    work_experience_list = applicant_data.get('work_experience', [])
-                    if work_experience_list:
-                        for i, exp in enumerate(work_experience_list):
-                            print(f"  - Experience #{i+1}:")
-                            print(f"    Position: {exp.get('position')}")
-                            print(f"    Company: {exp.get('company')}")
-                            print(f"    Dates: {exp.get('start_date')} to {exp.get('end_date')}")
-                            print(f"    Description: {exp.get('description', 'N/A')[:100]}...") # Truncated
-                    else:
-                        print("  No work experience listed.")
-
-                    # --- Education (List of Dictionaries) ---
-                    print("\n[-- Education --]")
-                    education_list = applicant_data.get('education', [])
-                    if education_list:
-                        for i, edu in enumerate(education_list):
-                            print(f"  - Education #{i+1}:")
-                            print(f"    Degree: {edu.get('degree')}")
-                            print(f"    Institution: {edu.get('institution')}")
-                            print(f"    Year: {edu.get('graduation_year')}")
-                            print(f"    GPA: {edu.get('gpa', 'N/A')}")
-                    else:
-                        print("  No education listed.")
-
-                    # --- Summary (String) ---
-                    print("\n[-- Summary --]")
-                    summary = applicant_data.get('summary', '')
-                    print(f"  {summary if summary else 'No summary available.'}")
-
-                    # --- Full Extracted Text (String) ---
-                    print("\n[-- Full Extracted Text (first 200 chars) --]")
-                    extracted_text = applicant_data.get('extracted_text', '')
-                    print(f"  {extracted_text[:200] if extracted_text else 'No extracted text.'}...")
-
-                    print("\n" + "="*26 + " DEBUG END " + "="*26 + "\n")
-
-
-                    # Prepare the detail view content
-                    detail_view_content = self.detail_view.build(applicant_data)
-
-                    self.current_view = "detail"
-                    self.page.clean()  # Clear all existing content from the page
-                    self.page.add(detail_view_content)  # Add the new detail view
-                    self.page.update()
-                else:
-                    self.page.snack_bar = ft.SnackBar(
-                        content=ft.Text(f"Applicant with ID {applicant_id} not found."),
-                        bgcolor=ft.Colors.YELLOW_200
-                    )
-                    self.page.snack_bar.open = True
-                    self.page.update()
-                    print(f"Applicant with ID {applicant_id} not found") # Keep console log for debugging
-            finally:
-                db.close()
-        except Exception as e:
-            self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(f"Error loading applicant details: {str(e)}"),
-                bgcolor=ft.Colors.RED_100
-            )
-            self.page.snack_bar.open = True
-            self.page.update()
-            print(f"Error loading applicant details: {e}") # Keep console log
+        self.selected_applicant_id = applicant_id
+        self.current_view = "detail"
+        self._update_content()
+        self.page.update()
 
     def on_back_to_results(self):
         """Handle back button from detail view"""
         self.current_view = "main"
-        main_view_content = self._build_main_view() # This builds your main layout
-        
-        self.page.clean()
-        self.page.add(main_view_content)
-        
-        # Restore search results if they exist after the main view is added
-        if hasattr(self, 'search_results') and self.search_results and self.components_initialized:
-            # Assuming results_section is part of what _build_main_view recreates
-            # You might need to access it through the newly built main_view_content if it's not directly self.results_section
-            # For simplicity, if _build_main_view uses self.results_section directly, this is fine:
-            self.results_section.update_results(self.search_results) 
-        
+        self._update_content()
         self.page.update()
 
+    def _build_error_view(self) -> ft.Control:
+        """Build error view when components fail to initialize"""
+        return ft.Column([
+            ft.Container(
+                content=ft.Column([
+                    ft.Text("Application Error", size=24,
+                            weight=ft.FontWeight.BOLD),
+                    ft.Text(
+                        "Failed to initialize application components.", size=16),
+                    ft.Text("Please check the console for error details.",
+                            size=14, color=ft.Colors.GREY_600),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                padding=50,
+                alignment=ft.alignment.center
+            )
+        ], expand=True)

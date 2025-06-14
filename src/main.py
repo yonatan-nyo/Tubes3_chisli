@@ -2,16 +2,19 @@ from dotenv import load_dotenv
 # Load environment variables from .env file FIRST - DO NOT MOVE THIS
 load_dotenv()
 
-from database.models.database import DATABASE_URL
-import flet as ft
-from database import init_db, SessionLocal, Applicant
-from database.models.init_database import get_schema_info
-from core.cv_processor import CVProcessor
-from core.search_engine import SearchEngine
-from gui.main_window import MainWindow
-import sys
-from pathlib import Path
+
 import os
+from pathlib import Path
+import sys
+from gui.main_window import MainWindow
+from core.search_engine import SearchEngine
+from core.cv_processor import CVProcessor
+from database.models.init_database import get_schema_info
+from database import init_db, SessionLocal, Applicant
+import flet as ft
+from database.models.database import DATABASE_URL
+
+
 
 # Add the src directory to the Python path
 src_dir = Path(__file__).parent
@@ -97,8 +100,9 @@ def main(page: ft.Page):
         main_window = MainWindow(
             page, SessionLocal, cv_processor, search_engine)
 
-        # Add main window to page
+        # Add main window to page and initialize content
         page.add(main_window.build())
+        main_window._update_content()  # Initialize with applicants page
         print("Application initialized successfully!")
 
     except Exception as e:
