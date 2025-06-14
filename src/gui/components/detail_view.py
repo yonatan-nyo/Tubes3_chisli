@@ -4,13 +4,14 @@ import subprocess
 import platform
 from typing import Callable, Dict, List
 
+
 class DetailView:
     """Detailed view for selected applicant"""
-    
+
     def __init__(self, page: ft.Page, on_back_callback: Callable):
         self.page = page
         self.on_back_callback = on_back_callback
-    
+
     def build(self, applicant_data: Dict) -> ft.Control:
         """Build detailed view for applicant"""
         return ft.Column([
@@ -25,11 +26,13 @@ class DetailView:
                     ft.Row([
                         ft.ElevatedButton(
                             "View Full CV",
-                            on_click=lambda e: self._open_cv_file(applicant_data.get('cv_file_path', ''))
+                            on_click=lambda e: self._open_cv_file(
+                                applicant_data.get('cv_file_path', ''))
                         ),
                         ft.ElevatedButton(
                             "View Extracted Text",
-                            on_click=lambda e: self._open_txt_file(applicant_data.get('txt_file_path', ''))
+                            on_click=lambda e: self._open_txt_file(
+                                applicant_data.get('txt_file_path', ''))
                         )
                     ], spacing=10)
                 ]),
@@ -37,113 +40,116 @@ class DetailView:
                 bgcolor=ft.Colors.BLUE_50,
                 border_radius=10,
                 margin=ft.Margin(0, 0, 0, 20)
-            ),
-            
-            # Main content - Make scrollable
+            ),            # Main content - Vertical layout with scrolling
             ft.Container(
-                content=ft.Row([
-                    # Left column - Personal info and summary
+                content=ft.Column([
+                    # Personal info and summary section
                     ft.Container(
                         content=self._build_personal_section(applicant_data),
-                        width=400,
-                        padding=20,
-                        border=ft.border.all(1, ft.Colors.GREY_300),
-                        border_radius=10
-                    ),
-                    
-                    # Right column - Skills, experience, education
-                    ft.Container(
-                        content=self._build_details_section(applicant_data),
-                        expand=True,
                         padding=20,
                         border=ft.border.all(1, ft.Colors.GREY_300),
                         border_radius=10,
-                        margin=ft.Margin(20, 0, 0, 0)
+                        margin=ft.Margin(0, 0, 0, 20)
+                    ),
+
+                    # Skills, experience, education section
+                    ft.Container(
+                        content=self._build_details_section(applicant_data),
+                        padding=20,
+                        border=ft.border.all(1, ft.Colors.GREY_300),
+                        border_radius=10
                     )
-                ], expand=True, scroll=ft.ScrollMode.AUTO),
-                expand=True,
-                height=600  # Fixed height to enable scrolling
+                ], scroll=ft.ScrollMode.AUTO, expand=True),
+                expand=True
             )
         ], expand=True, scroll=ft.ScrollMode.AUTO)
-    
+
     def _build_personal_section(self, applicant_data: Dict) -> ft.Control:
         """Build personal information section"""
         return ft.Column([
             # Profile header
             ft.Container(
-                content=ft.Row([
-                    ft.Column([
-                        ft.Text(
-                            applicant_data.get('name', 'Unknown'),
-                            size=20,
-                            weight=ft.FontWeight.BOLD
-                        ),
-                        ft.Text(
-                            f"ID: {applicant_data.get('id', 'N/A')}",
-                            size=12,
-                            color=ft.Colors.GREY_600
-                        )
-                    ], spacing=2, expand=True)
-                ]),
+                content=ft.Column([
+                    ft.Text(
+                        applicant_data.get('name', 'Unknown'),
+                        size=20,
+                        weight=ft.FontWeight.BOLD,
+                        text_align=ft.TextAlign.CENTER
+                    ),
+                    ft.Text(
+                        f"ID: {applicant_data.get('id', 'N/A')}",
+                        size=12,
+                        color=ft.Colors.GREY_600,
+                        text_align=ft.TextAlign.CENTER
+                    )
+                ], spacing=5, horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 padding=20,
                 bgcolor=ft.Colors.BLUE_50,
                 border_radius=8,
                 margin=ft.Margin(0, 0, 0, 20)
             ),
-            
+
             # Contact information with file paths
             self._build_info_card("Contact Information", [
                 ("Email", applicant_data.get('email', 'Not provided')),
                 ("Phone", applicant_data.get('phone', 'Not provided')),
                 ("CV Uploaded", applicant_data.get('created_at', 'Unknown')),
-                ("PDF File", os.path.basename(applicant_data.get('cv_file_path', 'N/A'))),
-                ("TXT File", os.path.basename(applicant_data.get('txt_file_path', 'N/A')))
+                ("PDF File", os.path.basename(
+                    applicant_data.get('cv_file_path', 'N/A'))),
+                ("TXT File", os.path.basename(
+                    applicant_data.get('txt_file_path', 'N/A')))
             ]),
-            
+
             ft.Container(height=20),
-            
+
             # Summary section
             self._build_summary_card(applicant_data.get('summary', ''))
-        ], scroll=ft.ScrollMode.AUTO)
-    
+        ], spacing=0)
+
     def _build_details_section(self, applicant_data: Dict) -> ft.Control:
         """Build details section with skills, experience, education"""
         return ft.Column([
             # Skills section
             self._build_skills_section(applicant_data.get('skills', [])),
-            
+
             ft.Container(height=20),
-            
+
             # Work experience section
-            self._build_work_experience_section(applicant_data.get('work_experience', [])),
-            
+            self._build_work_experience_section(
+                applicant_data.get('work_experience', [])),
+
             ft.Container(height=20),
-            
+
             # Education section
             self._build_education_section(applicant_data.get('education', []))
         ], scroll=ft.ScrollMode.AUTO)
-    
+
     def _build_info_card(self, title: str, info_items: List[tuple]) -> ft.Control:
         """Build information card"""
         content = [ft.Text(title, size=16, weight=ft.FontWeight.BOLD)]
-        
+
         for label, value in info_items:
             content.extend([
                 ft.Container(height=8),
-                ft.Row([
-                    ft.Text(f"{label}:", weight=ft.FontWeight.W_500, width=80),
-                    ft.Text(str(value), expand=True)
-                ])
+                ft.Column([
+                    ft.Text(f"{label}:", weight=ft.FontWeight.W_500, size=12),
+                    ft.Text(
+                        str(value),
+                        size=12,
+                        no_wrap=False,  # Allow text wrapping
+                        overflow=ft.TextOverflow.VISIBLE
+                    )
+                ], spacing=2)
             ])
-        
+
         return ft.Container(
-            content=ft.Column(content),
+            content=ft.Column(content, spacing=5),
             padding=15,
             border=ft.border.all(1, ft.Colors.GREY_300),
             border_radius=8,
             bgcolor=ft.Colors.WHITE
         )
-    
+
     def _build_summary_card(self, summary: str) -> ft.Control:
         """Build summary card"""
         return ft.Container(
@@ -153,36 +159,41 @@ class DetailView:
                 ft.Text(
                     summary if summary else "No summary available",
                     size=14,
-                    color=ft.Colors.GREY_700 if summary else ft.Colors.GREY_500
+                    color=ft.Colors.GREY_700 if summary else ft.Colors.GREY_500,
+                    no_wrap=False,  # Allow text wrapping
+                    overflow=ft.TextOverflow.VISIBLE
                 )
-            ]),
+            ], spacing=5),
             padding=15,
             border=ft.border.all(1, ft.Colors.GREY_300),
             border_radius=8,
             bgcolor=ft.Colors.WHITE
         )
-    
+
     def _build_skills_section(self, skills: List[str]) -> ft.Control:
         """Build skills section"""
         if not skills:
-            content = ft.Text("No skills information available", color=ft.Colors.GREY_500)
+            content = ft.Text("No skills information available",
+                              color=ft.Colors.WHITE)
         else:
-            # Create skill chips
+            # Create skill chips with blue background and white text
             skill_chips = [
                 ft.Chip(
-                    label=ft.Text(skill),
-                    bgcolor=ft.Colors.BLUE_100,
-                    color=ft.Colors.BLUE_800
+                    label=ft.Text(skill, color=ft.Colors.WHITE),
+                    bgcolor=ft.Colors.BLUE,
+                    color=ft.Colors.BLUE
                 )
                 for skill in skills
             ]
-            
-            content = ft.Column([
-                ft.Row(skill_chips[:10], wrap=True, spacing=8),  # Limit to 10 skills per row
-                *([ft.Row(skill_chips[i:i+10], wrap=True, spacing=8) 
-                   for i in range(10, len(skill_chips), 10)] if len(skill_chips) > 10 else [])
-            ])
-        
+
+            # Use a single Row with wrap=True for responsive layout
+            content = ft.Row(
+                controls=skill_chips,
+                wrap=True,
+                spacing=8,
+                run_spacing=8  # Vertical spacing between wrapped rows
+            )
+
         return ft.Container(
             content=ft.Column([
                 ft.Text("Skills", size=16, weight=ft.FontWeight.BOLD),
@@ -194,11 +205,12 @@ class DetailView:
             border_radius=8,
             bgcolor=ft.Colors.WHITE
         )
-    
+
     def _build_work_experience_section(self, work_experience: List[Dict]) -> ft.Control:
         """Build work experience section"""
         if not work_experience:
-            content = ft.Text("No work experience information available", color=ft.Colors.GREY_500)
+            content = ft.Text(
+                "No work experience information available", color=ft.Colors.GREY_500)
         else:
             exp_items = []
             for exp in work_experience:
@@ -219,11 +231,13 @@ class DetailView:
                                 f"{exp.get('start_date', '')} - {exp.get('end_date', '')}",
                                 size=12,
                                 color=ft.Colors.GREY_600
-                            ),
-                            ft.Text(
-                                exp.get('description', '')[:200] + ("..." if len(exp.get('description', '')) > 200 else ''),
+                            ),                            ft.Text(
+                                exp.get('description', '')[
+                                    :200] + ("..." if len(exp.get('description', '')) > 200 else ''),
                                 size=12,
-                                color=ft.Colors.GREY_700
+                                color=ft.Colors.GREY_700,
+                                no_wrap=False,  # Allow text wrapping
+                                overflow=ft.TextOverflow.VISIBLE
                             ) if exp.get('description') else ft.Container()
                         ]),
                         padding=10,
@@ -232,9 +246,9 @@ class DetailView:
                         border_radius=6
                     )
                 )
-            
+
             content = ft.Column(exp_items)
-        
+
         return ft.Container(
             content=ft.Column([
                 ft.Text("Work Experience", size=16, weight=ft.FontWeight.BOLD),
@@ -246,11 +260,12 @@ class DetailView:
             border_radius=8,
             bgcolor=ft.Colors.WHITE
         )
-    
+
     def _build_education_section(self, education: List[Dict]) -> ft.Control:
         """Build education section"""
         if not education:
-            content = ft.Text("No education information available", color=ft.Colors.GREY_500)
+            content = ft.Text(
+                "No education information available", color=ft.Colors.GREY_500)
         else:
             edu_items = []
             for edu in education:
@@ -286,9 +301,9 @@ class DetailView:
                         border_radius=6
                     )
                 )
-            
+
             content = ft.Column(edu_items)
-        
+
         return ft.Container(
             content=ft.Column([
                 ft.Text("Education", size=16, weight=ft.FontWeight.BOLD),
@@ -300,7 +315,7 @@ class DetailView:
             border_radius=8,
             bgcolor=ft.Colors.WHITE
         )
-    
+
     def _open_cv_file(self, file_path: str):
         """Open CV file with default system application"""
         if not file_path or not os.path.exists(file_path):
@@ -311,7 +326,7 @@ class DetailView:
             self.page.snack_bar.open = True
             self.page.update()
             return
-        
+
         try:
             system = platform.system()
             if system == "Windows":
@@ -327,7 +342,7 @@ class DetailView:
             )
             self.page.snack_bar.open = True
             self.page.update()
-    
+
     def _open_txt_file(self, file_path: str):
         """Open extracted text file with default system application"""
         if not file_path or not os.path.exists(file_path):
@@ -338,7 +353,7 @@ class DetailView:
             self.page.snack_bar.open = True
             self.page.update()
             return
-        
+
         try:
             system = platform.system()
             if system == "Windows":
