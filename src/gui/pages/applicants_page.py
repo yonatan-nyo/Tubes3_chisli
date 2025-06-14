@@ -202,24 +202,9 @@ class ApplicantsPage:
                             ft.Text(applicant.date_of_birth.strftime("%Y-%m-%d") if applicant.date_of_birth else "No DOB",
                                     size=12, color=ft.Colors.GREY_500),
                         ], horizontal_alignment=ft.CrossAxisAlignment.END),
+                        # Address display (only if address exists)
                     ]),
-
-                    # Address display (only if address exists)
-                    *address_display,
-
-                    ft.Row([
-                        ft.TextButton(
-                            "View Applications",
-                            icon=ft.Icons.DESCRIPTION,
-                            on_click=lambda e, app_id=applicant.applicant_id: self._view_applications(
-                                app_id)
-                        ),
-                        ft.TextButton(
-                            "Edit",
-                            icon=ft.Icons.EDIT,
-                            disabled=True  # TODO: Implement edit functionality
-                        ),
-                    ], alignment=ft.MainAxisAlignment.END)
+                    *address_display
                 ], spacing=10),
                 padding=15
             ),
@@ -298,18 +283,7 @@ class ApplicantsPage:
         self.date_of_birth_field.value = None
         self.address_field.value = ""
         self.phone_number_field.value = ""
-        self.page.update()
 
-    def _view_applications(self, applicant_id: int):
-        """View applications for a specific applicant"""
-        # TODO: This could navigate to the Applications page with a filter
-        # For now, we'll just show a message
-        self.page.snack_bar = ft.SnackBar(
-            content=ft.Text(
-                f"Feature coming soon: View applications for applicant {applicant_id}"),
-            bgcolor=ft.Colors.BLUE_100
-        )
-        self.page.snack_bar.open = True
         self.page.update()
 
     def _refresh_applicants_list(self):
@@ -354,12 +328,3 @@ class ApplicantsPage:
             self.date_display_field.value = self.date_of_birth_field.value.strftime(
                 "%Y-%m-%d")
             self.page.update()
-
-    # Legacy methods to maintain compatibility with main window
-    def on_cv_uploaded(self, success: bool, message: str):
-        """Handle CV upload completion - deprecated, keeping for compatibility"""
-        pass
-
-    def set_upload_callback(self, callback: Callable):
-        """Set upload callback - deprecated, keeping for compatibility"""
-        pass

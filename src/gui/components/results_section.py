@@ -21,8 +21,15 @@ class ResultsSection:
 
         # UI components
         self.results_container = ft.Column([
-            ft.Text("No search results yet", color=ft.Colors.GREY_600, size=14)
-        ], scroll=ft.ScrollMode.AUTO)
+            ft.Container(
+                content=ft.Text("No search results yet",
+                                color=ft.Colors.GREY_600, size=14),
+                alignment=ft.alignment.center,
+                width=None,  # Take full width
+                expand=True,
+                padding=20
+            )
+        ], scroll=ft.ScrollMode.AUTO, expand=True, width=None)
 
         self.results_info = ft.Text("", size=12, color=ft.Colors.GREY_600)
 
@@ -39,13 +46,14 @@ class ResultsSection:
                     ft.Container(expand=True),
                     self.results_info
                 ], vertical_alignment=ft.CrossAxisAlignment.CENTER),
-                padding=ft.Padding(0, 0, 0, 10)
+                padding=ft.Padding(0, 0, 0, 10),
+                expand=True
             ),
-
-            # Results container with improved styling
             ft.Container(
                 content=self.results_container,
-                height=400,  # Increased height for better view
+                height=400,
+                width=None,
+                expand=True,
                 border=ft.border.all(1, ft.Colors.BLUE_200),
                 border_radius=12,
                 padding=15,
@@ -55,8 +63,8 @@ class ResultsSection:
                     blur_radius=8,
                     color=ft.Colors.with_opacity(0.1, ft.Colors.GREY_500),
                     offset=ft.Offset(0, 2)
-                )
-            )])
+                ),
+            )], expand=True)  # Make the main column expand to full width
 
     def update_results(self, search_results: Dict[str, Any]):
         """Update results display with type safety"""

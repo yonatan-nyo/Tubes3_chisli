@@ -25,30 +25,45 @@ class SearchPage:
 
     def build(self) -> ft.Control:
         """Build the search page"""
-        return ft.Column([
-            # Header
-            ft.Container(
-                content=ft.Row([
-                    ft.Text("Search Applicants", size=24,
-                            weight=ft.FontWeight.BOLD),
-                ], alignment=ft.MainAxisAlignment.START),
-                padding=30,
-                bgcolor=ft.Colors.WHITE,
-                border=ft.border.only(
-                    bottom=ft.BorderSide(1, ft.Colors.GREY_300))
-            ),
+        return ft.Container(
+            content=ft.Column([
+                # Header
+                ft.Container(
+                    content=ft.Row([
+                        ft.Text("Search Applicants", size=24,
+                                weight=ft.FontWeight.BOLD),
+                    ], alignment=ft.MainAxisAlignment.START),
+                    padding=30,
+                    bgcolor=ft.Colors.WHITE,
+                    border=ft.border.only(
+                        bottom=ft.BorderSide(1, ft.Colors.GREY_300)),
+                    width=None  # Take full width
+                ),
 
-            # Content
-            ft.Container(
-                content=ft.Column([
-                    self.search_section.build(),
-                    ft.Divider(height=20),
-                    self.results_section.build()
-                ], scroll=ft.ScrollMode.AUTO),
-                padding=30,
-                expand=True
-            )
-        ], expand=True, scroll=ft.ScrollMode.AUTO)
+                # Content
+                ft.Container(
+                    content=ft.Column([
+                        ft.Container(
+                            content=self.search_section.build(),
+                            width=None,  # Take full width
+                            expand=False
+                        ),
+                        ft.Divider(height=20),
+                        ft.Container(
+                            content=self.results_section.build(),
+                            width=None,  # Take full width
+                            expand=True,  # Expand to fill remaining space
+                            alignment=ft.alignment.top_left  # Ensure proper alignment
+                        )
+                    ], scroll=ft.ScrollMode.AUTO, expand=True),
+                    padding=30,
+                    expand=True,
+                    width=None  # Take full width of parent
+                )
+            ], expand=True, scroll=ft.ScrollMode.AUTO, width=None),
+            expand=True,
+            width=None  # Container takes full width
+        )
 
     def on_search_performed(self, results: Dict):
         """Handle search completion"""

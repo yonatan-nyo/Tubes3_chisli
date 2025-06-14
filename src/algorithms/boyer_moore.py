@@ -1,52 +1,53 @@
 from typing import List, Dict
 
+
 class BoyerMooreMatcher:
     """Boyer-Moore string matching algorithm"""
-    
+
     def __init__(self):
         pass
-    
+
     def search(self, text: str, pattern: str) -> List[int]:
-        """Search for pattern in text using Boyer-Moore algorithm"""
+        """Search for pattern in text using Boyer-Moore algorithm with last occurrence table"""
         if not pattern or not text:
             return []
-        
+
         pattern = pattern.lower()
         text = text.lower()
-        
-        # Build bad character table
-        bad_char = self._build_bad_char_table(pattern)
-        
+
+        # Build last occurrence table
+        last_occurrence = self._build_last_occurrence_table(pattern)
+
         matches = []
         shift = 0
-        
+
         while shift <= len(text) - len(pattern):
             j = len(pattern) - 1
-            
-            # Keep reducing j while characters match
+
+            # Keep reducing j while characters match (right to left)
             while j >= 0 and pattern[j] == text[shift + j]:
                 j -= 1
-            
+
             if j < 0:
                 # Pattern found
                 matches.append(shift)
-                
-                # Shift pattern to align with next character
-                if shift + len(pattern) < len(text):
-                    shift += len(pattern) - bad_char.get(text[shift + len(pattern)], -1)
-                else:
-                    shift += 1
+                shift += 1  # Move to next position
             else:
-                # Shift pattern based on bad character rule
-                shift += max(1, j - bad_char.get(text[shift + j], -1))
-        
+                # Calculate shift using last occurrence rule
+                mismatched_char = text[shift + j]
+                last_pos = last_occurrence.get(mismatched_char, -1)
+
+                # Boyer-Moore bad character shift
+                shift += max(1, j - last_pos)
+
         return matches
-    
-    def _build_bad_char_table(self, pattern: str) -> Dict[str, int]:
-        """Build bad character table for Boyer-Moore"""
-        bad_char = {}
-        
+
+    def _build_last_occurrence_table(self, pattern: str) -> Dict[str, int]:
+        """Build last occurrence table for Boyer-Moore bad character rule"""
+        last_occurrence = {}
+
+        # Record the last occurrence of each character in the pattern
         for i in range(len(pattern)):
-            bad_char[pattern[i]] = i
-        
-        return bad_char
+            last_occurrence[pattern[i]] = i
+
+        return last_occurrence
