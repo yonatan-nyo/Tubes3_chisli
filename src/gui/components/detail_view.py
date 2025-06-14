@@ -35,18 +35,17 @@ class DetailView:
                             on_click=lambda e: self.on_back_callback()
                         ),
                         ft.Container(expand=True),
-                        ft.Row([
-                            ft.ElevatedButton(
-                                "View Full CV",
+                        ft.Row([ft.ElevatedButton(
+                            "View Full CV",
                                 on_click=lambda e: self._open_cv_file(
-                                    safe_get_str(applicant_data, 'cv_file_path', ''))
-                            ),
-                            ft.ElevatedButton(
+                                    safe_get_str(applicant_data, 'cv_path', ''))
+                                ),
+                                ft.ElevatedButton(
                                 "View Extracted Text",
                                 on_click=lambda e: self._open_txt_file(
-                                    safe_get_str(applicant_data, 'txt_file_path', ''))
-                            )
-                        ], spacing=10)
+                                    safe_get_str(applicant_data, 'cv_path', ''))
+                                )
+                                ], spacing=10)
                     ]),
                     padding=20,
                     bgcolor=ft.Colors.BLUE_50,
@@ -118,7 +117,7 @@ class DetailView:
                         text_align=ft.TextAlign.CENTER
                     ),
                     ft.Text(
-                        f"ID: {safe_get_str(applicant_data, 'id', 'N/A')}",
+                        f"ID: {safe_get_str(applicant_data, 'detail_id', 'N/A')}",
                         size=12,
                         color=ft.Colors.GREY_600,
                         text_align=ft.TextAlign.CENTER
@@ -138,11 +137,9 @@ class DetailView:
                     applicant_data, 'date_of_birth', 'Not provided')),
                 ("Role", safe_get_str(applicant_data,
                  'applicant_role', 'Not specified')),
-                ("CV Uploaded", safe_get_str(applicant_data, 'created_at', 'Unknown')),
-                ("PDF File", os.path.basename(safe_get_str(
-                    applicant_data, 'cv_file_path', 'N/A'))),
-                ("TXT File", os.path.basename(safe_get_str(
-                    applicant_data, 'txt_file_path', 'N/A')))
+                ("CV Uploaded", safe_get_str(applicant_data, 'created_at', 'Unknown')),                ("PDF File", os.path.basename(safe_get_str(
+                    applicant_data, 'cv_path', 'N/A'))),
+                ("TXT File", "Computed from CV")
             ]),
 
             ft.Container(height=20),
@@ -508,11 +505,11 @@ class DetailView:
             self.page.snack_bar.open = True
             self.page.update()
 
-    def _open_txt_file(self, file_path: str):
-        """Open extracted text file with default system application"""
-        if not file_path or not os.path.exists(file_path):
+    def _open_txt_file(self, cv_path: str):
+        """Open extracted text file or create it from CV file if needed"""
+        if not cv_path:
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("Extracted text file not found"),
+                content=ft.Text("CV file path not provided"),
                 bgcolor=ft.Colors.RED_100
             )
             self.page.snack_bar.open = True
@@ -520,13 +517,45 @@ class DetailView:
             return
 
         try:
-            system = platform.system()
-            if system == "Windows":
-                os.startfile(file_path)
-            elif system == "Darwin":  # macOS
-                subprocess.run(["open", file_path])
-            else:  # Linux
-                subprocess.run(["xdg-open", file_path])
+            # First, try to find corresponding extracted text file
+            extracted_text_path = self._find_extracted_text_file(cv_path)
+
+            if extracted_text_path and os.path.exists(extracted_text_path):
+                # Open existing extracted text file
+                self._open_file_with_system(extracted_text_path)
+            else:
+                # Create a temporary text file with computed content
+                import tempfile
+                from core.cv_processor import CVProcessor
+
+                processor = CVProcessor()
+                computed_fields = processor.compute_cv_fields(cv_path)
+                extracted_text = safe_get_str(
+                    computed_fields, 'extracted_text', '')
+
+                if not extracted_text:
+                    self.page.snack_bar = ft.SnackBar(
+                        content=ft.Text("No text could be extracted from CV"),
+                        bgcolor=ft.Colors.RED_100
+                    )
+                    self.page.snack_bar.open = True
+                    self.page.update()
+                    return
+
+                # Create temporary file with extracted text
+                with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False, encoding='utf-8') as temp_file:
+                    temp_file.write("=" * 50 + "\n")
+                    temp_file.write("EXTRACTED TEXT FROM CV\n")
+                    temp_file.write(f"Source: {os.path.basename(cv_path)}\n")
+                    temp_file.write("=" * 50 + "\n\n")
+                    temp_file.write(extracted_text)
+                    temp_file.write("\n\n" + "=" * 50 + "\n")
+                    temp_file.write("END OF EXTRACTED TEXT\n")
+                    temp_file.write("=" * 50)
+                    temp_path = temp_file.name
+
+                self._open_file_with_system(temp_path)
+
         except Exception as e:
             self.page.snack_bar = ft.SnackBar(
                 content=ft.Text(f"Error opening text file: {str(e)}"),
@@ -534,3 +563,37 @@ class DetailView:
             )
             self.page.snack_bar.open = True
             self.page.update()
+
+    def _find_extracted_text_file(self, cv_path: str) -> str:
+        """Find corresponding extracted text file for a CV file"""
+        try:
+            import glob
+            base_name = os.path.basename(cv_path)
+            # Remove the timestamp prefix and extension, then add _extracted.txt
+            parts = base_name.split('_', 1)
+            if len(parts) > 1:
+                original_part = parts[1]
+                # Remove extension
+                original_part = os.path.splitext(original_part)[0]
+                # Look for extracted text file
+                txt_storage_path = "data/extracted_text"
+                extracted_pattern = f"*_{original_part}_extracted.txt"
+                extracted_files = glob.glob(os.path.join(
+                    txt_storage_path, extracted_pattern))
+                if extracted_files:
+                    # Use the most recent one
+                    extracted_files.sort()
+                    return extracted_files[-1]
+        except Exception as e:
+            print(f"Error finding extracted text file: {e}")
+        return ""
+
+    def _open_file_with_system(self, file_path: str):
+        """Open file with default system application"""
+        system = platform.system()
+        if system == "Windows":
+            os.startfile(file_path)
+        elif system == "Darwin":  # macOS
+            subprocess.run(["open", file_path])
+        else:  # Linux
+            subprocess.run(["xdg-open", file_path])

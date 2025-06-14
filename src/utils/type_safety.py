@@ -14,12 +14,12 @@ T = TypeVar('T')
 @dataclass
 class ApplicantDataSchema:
     """Type-safe schema for applicant data passed between components"""
-    id: int
+    detail_id: int
+    applicant_id: int
     name: str
     email: str
     phone: str
-    cv_file_path: str
-    txt_file_path: str
+    cv_path: str
     extracted_text: str
     summary: str
     skills: List[str]
@@ -36,12 +36,12 @@ class ApplicantDataSchema:
     def from_dict(cls, data: Dict[str, Any]) -> 'ApplicantDataSchema':
         """Create ApplicantDataSchema from dictionary with validation"""
         return cls(
-            id=safe_get_int(data, 'id', 0),
+            detail_id=safe_get_int(data, 'detail_id', 0),
+            applicant_id=safe_get_int(data, 'applicant_id', 0),
             name=safe_get_str(data, 'name', 'Unknown'),
             email=safe_get_str(data, 'email', 'Not provided'),
             phone=safe_get_str(data, 'phone', 'Not provided'),
-            cv_file_path=safe_get_str(data, 'cv_file_path', ''),
-            txt_file_path=safe_get_str(data, 'txt_file_path', ''),
+            cv_path=safe_get_str(data, 'cv_path', ''),
             extracted_text=safe_get_str(data, 'extracted_text', ''),
             summary=safe_get_str(data, 'summary', ''),
             skills=safe_get_list(data, 'skills', []),
@@ -59,12 +59,12 @@ class ApplicantDataSchema:
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for backward compatibility"""
         return {
-            'id': self.id,
+            'detail_id': self.detail_id,
+            'applicant_id': self.applicant_id,
             'name': self.name,
             'email': self.email,
             'phone': self.phone,
-            'cv_file_path': self.cv_file_path,
-            'txt_file_path': self.txt_file_path,
+            'cv_path': self.cv_path,
             'extracted_text': self.extracted_text,
             'summary': self.summary,
             'skills': self.skills,

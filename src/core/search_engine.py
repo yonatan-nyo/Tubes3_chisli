@@ -6,6 +6,7 @@ from algorithms.kmp import KMPMatcher
 from algorithms.boyer_moore import BoyerMooreMatcher
 from algorithms.aho_corasick import AhoCorasickMatcher
 from algorithms.fuzzy_matcher import FuzzyMatcher
+from core.cv_processor import CVProcessor
 from utils.type_safety import (
     safe_get_str,
     safe_get_list,
@@ -26,6 +27,8 @@ class SearchEngine:
         self.boyer_moore_matcher: BoyerMooreMatcher = BoyerMooreMatcher()
         self.aho_corasick_matcher: AhoCorasickMatcher = AhoCorasickMatcher()
         self.fuzzy_matcher: FuzzyMatcher = FuzzyMatcher()
+        # Initialize CV processor for computing fields on demand
+        self.cv_processor: CVProcessor = CVProcessor()
 
     def search(self, keywords: List[str], algorithm: str = "KMP",
                max_results: int = 10, fuzzy_threshold: float = 0.7) -> Dict[str, Any]:
@@ -58,8 +61,27 @@ class SearchEngine:
                         last_name = safe_get_str(profile_dict, 'last_name', '')
                         detail_dict['name'] = f"{first_name} {last_name}".strip(
                         ) or "Unknown"
+
+                        # Flatten profile fields for easier access in detail view
+                        detail_dict['phone'] = safe_get_str(
+                            profile_dict, 'phone_number', '')
+                        detail_dict['address'] = safe_get_str(
+                            profile_dict, 'address', '')
+                        detail_dict['date_of_birth'] = safe_get_str(
+                            profile_dict, 'date_of_birth', '')
                     else:
                         detail_dict['name'] = "Unknown"
+                        detail_dict['phone'] = ''
+                        detail_dict['address'] = ''
+                        detail_dict['date_of_birth'] = ''
+
+                    # Compute CV fields on demand for search
+                    cv_path = safe_get_str(detail_dict, 'cv_path', '')
+                    if cv_path:
+                        computed_fields = self.cv_processor.compute_cv_fields(
+                            cv_path)
+                        detail_dict.update(computed_fields)
+
                     applicant_dicts.append(detail_dict)
             finally:
                 db.close()
@@ -294,34 +316,42 @@ class SearchEngine:
             if full_name:
                 text_parts.append(full_name)
 
+            # Add applicant role from the detail
             text_parts.append(safe_get_str(applicant, 'applicant_role', ''))
-            text_parts.append(safe_get_str(applicant, 'summary', ''))
 
-            # Skills
-            skills = safe_get_list(applicant, 'skills', [])
-            for skill in skills:
-                if isinstance(skill, str):
-                    text_parts.append(skill)
-                elif isinstance(skill, dict):
-                    text_parts.append(safe_get_str(skill, 'name', ''))
+            # Compute CV fields on demand from CV path
+            cv_path = safe_get_str(applicant, 'cv_path', '')
+            if cv_path:
+                computed_fields = self.cv_processor.compute_cv_fields(cv_path)
 
-            # Work experience
-            work_experience = safe_get_list(applicant, 'work_experience', [])
-            for exp in work_experience:
-                if is_dict(exp):
-                    text_parts.append(safe_get_str(exp, 'position', ''))
-                    text_parts.append(safe_get_str(exp, 'company', ''))
-                    text_parts.append(safe_get_str(exp, 'description', ''))
+                # Add computed summary
+                text_parts.append(safe_get_str(computed_fields, 'summary', ''))
 
-            # Education
-            education = safe_get_list(applicant, 'education', [])
-            for edu in education:
-                if is_dict(edu):
-                    text_parts.append(safe_get_str(edu, 'degree', ''))
-                    text_parts.append(safe_get_str(edu, 'institution', ''))
+                # Add computed skills
+                skills = safe_get_list(computed_fields, 'skills', [])
+                for skill in skills:
+                    if isinstance(skill, str):
+                        text_parts.append(skill)
 
-            # Full extracted text as fallback
-            text_parts.append(safe_get_str(applicant, 'extracted_text', ''))
+                # Add computed work experience
+                work_experience = safe_get_list(
+                    computed_fields, 'work_experience', [])
+                for exp in work_experience:
+                    if is_dict(exp):
+                        text_parts.append(safe_get_str(exp, 'position', ''))
+                        text_parts.append(safe_get_str(exp, 'company', ''))
+                        text_parts.append(safe_get_str(exp, 'description', ''))
+
+                # Add computed education
+                education = safe_get_list(computed_fields, 'education', [])
+                for edu in education:
+                    if is_dict(edu):
+                        text_parts.append(safe_get_str(edu, 'degree', ''))
+                        text_parts.append(safe_get_str(edu, 'institution', ''))
+
+                # Add full extracted text
+                text_parts.append(safe_get_str(
+                    computed_fields, 'extracted_text', ''))
 
             # Filter out empty strings and join
             filtered_parts = [part.strip()
@@ -331,8 +361,8 @@ class SearchEngine:
         except Exception as e:
             print(
                 f"Warning: Error getting searchable text from applicant data: {e}")
-            # Return extracted text as fallback
-            return safe_get_str(applicant, 'extracted_text', '')
+            # Return applicant role as fallback
+            return safe_get_str(applicant, 'applicant_role', '')
 
     def _combine_and_rank_results(self, exact_results: Dict,
                                   fuzzy_results: Dict) -> List[Dict]:
@@ -362,10 +392,46 @@ class SearchEngine:
             detail_id = int(detail_id)
             db = SessionLocal()
             try:
-                applicant_detail = db.query(ApplicantDetail).filter(
+                from sqlalchemy.orm import joinedload
+                applicant_detail = db.query(ApplicantDetail).options(
+                    joinedload(ApplicantDetail.profile)).filter(
                     ApplicantDetail.detail_id == detail_id).first()
+
                 if applicant_detail:
-                    return applicant_detail.to_dict()
+                    detail_dict = applicant_detail.to_dict()
+                    # Add profile information
+                    if applicant_detail.profile:
+                        profile_dict = applicant_detail.profile.to_dict()
+                        detail_dict['profile'] = profile_dict
+
+                        # Flatten profile fields for compatibility with UI
+                        detail_dict['phone'] = safe_get_str(
+                            profile_dict, 'phone_number', '')
+                        detail_dict['address'] = safe_get_str(
+                            profile_dict, 'address', '')
+                        detail_dict['date_of_birth'] = safe_get_str(
+                            profile_dict, 'date_of_birth', '')
+
+                        # Add computed name field for display
+                        first_name = safe_get_str(
+                            profile_dict, 'first_name', '')
+                        last_name = safe_get_str(profile_dict, 'last_name', '')
+                        detail_dict['name'] = f"{first_name} {last_name}".strip(
+                        ) or "Unknown"
+                    else:
+                        detail_dict['name'] = "Unknown"
+                        detail_dict['phone'] = ""
+                        detail_dict['address'] = ""
+                        detail_dict['date_of_birth'] = ""
+
+                    # Compute CV fields on demand
+                    cv_path = safe_get_str(detail_dict, 'cv_path', '')
+                    if cv_path:
+                        computed_fields = self.cv_processor.compute_cv_fields(
+                            cv_path)
+                        detail_dict.update(computed_fields)
+
+                    return detail_dict
             finally:
                 db.close()
         except Exception as e:

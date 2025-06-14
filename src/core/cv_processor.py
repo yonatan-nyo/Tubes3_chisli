@@ -1,11 +1,10 @@
 import pdfplumber
 import re
 import os
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import shutil
 import pandas as pd
-import json
 from database.models.applicant import ApplicantProfile, ApplicantDetail
 from database.models.database import SessionLocal
 
@@ -74,7 +73,7 @@ class CVProcessor:
                            'accomplishments', 'experience', 'education']
         target_section = section_name.lower()
 
-        for line in lines:
+        for i, line in enumerate(lines):
             line_lower = line.lower()
 
             # Check if this line is the target section header
@@ -408,84 +407,28 @@ class CVProcessor:
                                     cv_path_for_db: Optional[str], txt_path_for_db: Optional[str],
                                     category: Optional[str] = None, applicant_id: Optional[int] = None) -> Optional[int]:
         """Common logic to process extracted text and save to DB using new schema."""
-        print(f"\n=== DEBUG: Processing CV - {source_reference} ===")
-
         # Extract applicant role from first line
         applicant_role = self.extract_applicant_role(extracted_text)
-        print(f"Applicant Role extracted: {applicant_role}")
 
-        summary = self.extract_summary(extracted_text)
-        print(
-            f"Summary extracted: {summary[:100] + '...' if summary and len(summary) > 100 else summary}")
-
-        skills = self.extract_skills(extracted_text)
-        print(f"Skills extracted ({len(skills)} items): {skills}")
-
-        highlights = self.extract_highlights(extracted_text)
-        print(f"Highlights extracted ({len(highlights)} items): {highlights}")
-
-        accomplishments = self.extract_accomplishments(extracted_text)
-        print(
-            f"Accomplishments extracted ({len(accomplishments)} items): {accomplishments}")
-
-        work_experience = self.extract_work_experience(extracted_text)
-        print(f"Work Experience extracted ({len(work_experience)} items):")
-        for i, exp in enumerate(work_experience):
-            print(f"  Experience {i+1}: {exp}")
-
-        education = self.extract_education(extracted_text)
-        print(f"Education extracted ({len(education)} items):")
-        for i, edu in enumerate(education):
-            print(f"  Education {i+1}: {edu}")
-
-        print("=== END DEBUG OUTPUT ===\n")
-
-        # Ensure cv_file_path is never None to satisfy nullable=False constraint
+        # Ensure cv_path is never None to satisfy nullable=False constraint
         final_cv_path_for_db = cv_path_for_db
         if final_cv_path_for_db is None:
             if txt_path_for_db:
-                final_cv_path_for_db = txt_path_for_db  # Use txt_file_path as a substitute
+                final_cv_path_for_db = txt_path_for_db  # Use txt_path as fallback for cv_path
             else:
                 # This is a last resort, should ideally not be hit if txt_file always saves
                 final_cv_path_for_db = f"MISSING_FILE_PATH_FOR_{source_reference.replace('.', '_')}"
 
-        # Ensure txt_file_path is also not None if DB expects it
-        final_txt_path_for_db = txt_path_for_db
-        if final_txt_path_for_db is None and final_cv_path_for_db is not None and ".txt" in final_cv_path_for_db:
-            # If cv_path ended up being the txt_path, txt_path can be the same.
-            final_txt_path_for_db = final_cv_path_for_db
-        elif final_txt_path_for_db is None:
-            final_txt_path_for_db = f"MISSING_TXT_PATH_FOR_{source_reference.replace('.', '_')}"
-
         # If no applicant_id is provided, create a random applicant or use a default one
         if applicant_id is None:
+            # Create ApplicantDetail data - only store essential fields
             applicant_id = self._get_or_create_random_applicant()
 
-        # Create ApplicantDetail data
         applicant_detail_data = {
             'applicant_id': applicant_id,
             'applicant_role': applicant_role,
-            'cv_path': final_cv_path_for_db,
-            'txt_file_path': final_txt_path_for_db,
-            'extracted_text': extracted_text,
-            'summary': summary,
-            'skills': json.dumps(skills) if skills else None,
-            'highlights': json.dumps(highlights) if highlights else None,
-            'accomplishments': json.dumps(accomplishments) if accomplishments else None,
-            'work_experience': json.dumps(work_experience) if work_experience else None,
-            'education': json.dumps(education) if education else None,
+            'cv_path': final_cv_path_for_db
         }
-
-        print(f"DEBUG: Final applicant detail data structure:")
-        print(f"  - Applicant ID: {applicant_detail_data['applicant_id']}")
-        print(f"  - Applicant Role: {applicant_detail_data['applicant_role']}")
-        print(f"  - Skills count: {len(skills)}")
-        print(f"  - Highlights count: {len(highlights)}")
-        print(f"  - Accomplishments count: {len(accomplishments)}")
-        print(f"  - Work experience count: {len(work_experience)}")
-        print(f"  - Education count: {len(education)}")
-        print(f"  - Summary length: {len(summary) if summary else 0}")
-        print("DEBUG: Attempting to save to database...")
 
         db = SessionLocal()
         try:
@@ -495,8 +438,6 @@ class CVProcessor:
             db.commit()
             db.refresh(applicant_detail)
 
-            print(
-                f"SUCCESS: Saved CV to database with detail_id: {applicant_detail.detail_id}")
             return applicant_detail.detail_id
 
         except Exception as e:
@@ -615,3 +556,110 @@ class CVProcessor:
             f"Successfully processed and saved to DB: {processed_count} resumes.")
         print(
             f"Failed to save to DB (or save text file): {failed_to_save_db_count} resumes.")
+
+    def compute_cv_fields(self, cv_path: str) -> Dict[str, Any]:
+        """Compute all CV fields on demand from stored CV file or extracted text"""
+
+        try:
+            # First try to read from corresponding extracted text file
+            extracted_text = ""
+
+            # Check if this is already an extracted text file
+            if cv_path.endswith('_extracted.txt'):
+                extracted_text = self._read_extracted_text_file(cv_path)
+            else:
+                # Try to find corresponding extracted text file
+                base_name = os.path.basename(cv_path)
+                # Remove the timestamp prefix and extension, then add _extracted.txt
+                parts = base_name.split('_', 1)
+                if len(parts) > 1:
+                    original_part = parts[1]
+                    # Remove extension
+                    original_part = os.path.splitext(original_part)[0]
+                    # Look for extracted text file
+                    extracted_pattern = f"*_{original_part}_extracted.txt"
+                    import glob
+                    extracted_files = glob.glob(os.path.join(
+                        self.txt_storage_path, extracted_pattern))
+                    if extracted_files:
+                        # Use the most recent one
+                        extracted_files.sort()
+                        extracted_text = self._read_extracted_text_file(
+                            extracted_files[-1])
+
+                # If no extracted text file found, extract from PDF directly
+                if not extracted_text and cv_path.lower().endswith('.pdf'):
+                    extracted_text = self.extract_text_from_pdf(cv_path)
+
+            if not extracted_text:
+                return {
+                    'summary': '',
+                    'skills': [],
+                    'highlights': [],
+                    'accomplishments': [],
+                    'work_experience': [],
+                    'education': [],
+                    'extracted_text': ''
+                }
+
+            # Compute all fields
+            result = {
+                'summary': self.extract_summary(extracted_text),
+                'skills': self.extract_skills(extracted_text),
+                'highlights': self.extract_highlights(extracted_text),
+                'accomplishments': self.extract_accomplishments(extracted_text),
+                'work_experience': self.extract_work_experience(extracted_text),
+                'education': self.extract_education(extracted_text),
+                'extracted_text': extracted_text
+            }
+
+            return result
+
+        except Exception as e:
+            print(f"Error computing CV fields for {cv_path}: {e}")
+            return {
+                'summary': '',
+                'skills': [],
+                'highlights': [],
+                'accomplishments': [],
+                'work_experience': [],
+                'education': [],
+                'extracted_text': ''
+            }
+
+    def _read_extracted_text_file(self, file_path: str) -> str:
+        """Read extracted text from a stored text file"""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+
+                # Extract the actual CV text (after the header)
+                if "END OF EXTRACTED TEXT" in content:
+                    # Find the actual CV content between header and footer
+                    lines = content.split('\n')
+                    cv_start_idx = -1
+
+                    # Skip the header section (===, title, source, date, ===)
+                    for i, line in enumerate(lines):
+                        if i > 4 and line.strip() and not line.startswith('='):
+                            cv_start_idx = i
+                            break
+
+                    # Find where the footer starts
+                    cv_end_idx = -1
+                    for i, line in enumerate(lines):
+                        if line.strip().startswith('=' * 50) and i > 10:  # Skip the header ===
+                            cv_end_idx = i
+                            break
+
+                    if cv_start_idx != -1 and cv_end_idx != -1:
+                        cv_content = '\n'.join(
+                            lines[cv_start_idx:cv_end_idx]).strip()
+                        return cv_content
+
+                # Fallback: return whole content minus obvious header/footer
+                return content
+
+        except Exception as e:
+            print(f"Error reading extracted text file {file_path}: {e}")
+            return ""
