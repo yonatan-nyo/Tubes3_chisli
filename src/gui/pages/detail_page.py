@@ -19,12 +19,11 @@ class DetailPage:
 
     def __init__(self, page: ft.Page, session_factory: Callable[[], Session], on_back: Callable[[], None]):
         self.page: ft.Page = page
-        self.session_factory: Callable[[], Session] = session_factory
-        # Initialize detail view component
+        self.session_factory: Callable[[], Session] = session_factory        # Initialize detail view component
         self.on_back: Callable[[], None] = on_back
         self.detail_view: DetailView = DetailView(self.page, self.on_back)
-        self.current_detail_id: Optional[int] = None
         # Initialize search engine for computing CV fields
+        self.current_detail_id: Optional[int] = None
         self.search_engine: SearchEngine = SearchEngine()
 
     def build(self, detail_id: int) -> ft.Control:

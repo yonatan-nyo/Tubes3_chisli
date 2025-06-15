@@ -11,7 +11,15 @@ class ApplicantsPage:
         self.page = page
         self.session_factory = session_factory
         self.cv_processor = cv_processor
-        self.on_view_detail = on_view_detail        # Form fields
+        self.on_view_detail = on_view_detail
+
+        # Pagination state
+        self.current_page = 1
+        self.items_per_page = 10
+        self.total_applicants = 0
+        self.total_pages = 0
+
+        # Form fields
         self.first_name_field = ft.TextField(label="First Name", width=300)
         self.last_name_field = ft.TextField(label="Last Name", width=300)
         self.date_of_birth_field = ft.DatePicker(
@@ -40,6 +48,10 @@ class ApplicantsPage:
 
         # UI component references for dynamic updates
         self.applicants_list_container = None
+        self.pagination_info = None
+        self.prev_button = None
+        self.next_button = None
+        self.page_input = None
 
     def set_applicant_created_callback(self, callback: Callable):
         """Set callback for when applicant is created"""
@@ -47,6 +59,26 @@ class ApplicantsPage:
 
     def build(self) -> ft.Control:
         """Build the applicants management page"""
+        # Initialize pagination components
+        self.pagination_info = ft.Text("", size=12, color=ft.Colors.GREY_600)
+        self.prev_button = ft.IconButton(
+            icon=ft.Icons.CHEVRON_LEFT,
+            on_click=self._on_prev_page,
+            disabled=True
+        )
+        self.next_button = ft.IconButton(
+            icon=ft.Icons.CHEVRON_RIGHT,
+            on_click=self._on_next_page,
+            disabled=True
+        )
+        self.page_input = ft.TextField(
+            label="Page",
+            width=80,
+            text_align=ft.TextAlign.CENTER,
+            on_submit=self._on_page_input_submit,
+            input_filter=ft.NumbersOnlyInputFilter()
+        )
+
         # Create the applicants list container
         self.applicants_list_container = ft.Container(
             content=self._build_applicants_list(),
@@ -65,7 +97,7 @@ class ApplicantsPage:
                     ft.Text("Applicant Management", size=24,
                             weight=ft.FontWeight.BOLD),
                 ], alignment=ft.MainAxisAlignment.START),
-                padding=30,
+                padding=10,
                 bgcolor=ft.Colors.WHITE,
                 border=ft.border.only(
                     bottom=ft.BorderSide(1, ft.Colors.GREY_300))
@@ -86,10 +118,13 @@ class ApplicantsPage:
                         height=600
                     ),
 
-                    # Applicants list
-                    self.applicants_list_container
+                    # Applicants list with pagination
+                    ft.Column([
+                        self.applicants_list_container,
+                        self._build_pagination_controls()
+                    ], expand=True)
                 ], expand=True),
-                padding=30,
+                padding=10,
                 expand=True
             )
         ], expand=True, scroll=ft.ScrollMode.AUTO)
@@ -126,29 +161,63 @@ class ApplicantsPage:
         ], spacing=15)
 
     def _build_applicants_list(self) -> ft.Control:
-        """Build the list of applicants"""
+        """Build the list of applicants with pagination"""
         try:
             db = self.session_factory()
             try:
+                # Get total count for pagination
+                self.total_applicants = db.query(ApplicantProfile).count()
+                self.total_pages = max(
+                    1, (self.total_applicants + self.items_per_page - 1) // self.items_per_page)
+
+                # Ensure current page is within bounds
+                self.current_page = max(
+                    1, min(self.current_page, self.total_pages))
+
+                # Calculate offset for pagination
+                offset = (self.current_page - 1) * self.items_per_page
+
+                # Get paginated applicants
                 applicants = db.query(ApplicantProfile).order_by(
-                    ApplicantProfile.first_name, ApplicantProfile.last_name).all()
+                    ApplicantProfile.first_name, ApplicantProfile.last_name).offset(offset).limit(self.items_per_page).all()
+
+                # Update pagination info
+                self._update_pagination_controls()
 
                 if not applicants:
-                    return ft.Container(
-                        content=ft.Column([
-                            ft.Icon(ft.Icons.PEOPLE_OUTLINE, size=64,
-                                    color=ft.Colors.GREY_400),
-                            ft.Text("No applicants found", size=16,
-                                    color=ft.Colors.GREY_600),
-                            ft.Text("Create a new applicant to get started",
-                                    size=14, color=ft.Colors.GREY_500),
-                        ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
-                        alignment=ft.alignment.center,
-                        expand=True
-                    )
+                    if self.total_applicants == 0:
+                        return ft.Container(
+                            content=ft.Column([
+                                ft.Icon(ft.Icons.PEOPLE_OUTLINE, size=64,
+                                        color=ft.Colors.GREY_400),
+                                ft.Text("No applicants found", size=16,
+                                        color=ft.Colors.GREY_600),
+                                ft.Text("Create a new applicant to get started",
+                                        size=14, color=ft.Colors.GREY_500),
+                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                            alignment=ft.alignment.center,
+                            expand=True
+                        )
+                    else:
+                        return ft.Container(
+                            content=ft.Column([
+                                ft.Icon(ft.Icons.PEOPLE_OUTLINE, size=64,
+                                        color=ft.Colors.GREY_400),
+                                ft.Text("No applicants on this page", size=16,
+                                        color=ft.Colors.GREY_600),
+                            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                            alignment=ft.alignment.center,
+                            expand=True
+                        )
 
                 return ft.Column([
-                    ft.Text("Applicants", size=18, weight=ft.FontWeight.BOLD),
+                    ft.Row([
+                        ft.Text("Applicants", size=18,
+                                weight=ft.FontWeight.BOLD),
+                        ft.Container(expand=True),
+                        ft.Text(f"Total: {self.total_applicants}",
+                                size=14, color=ft.Colors.GREY_600)
+                    ]),
                     ft.Divider(),
                     ft.Container(
                         content=ft.Column([
@@ -166,7 +235,8 @@ class ApplicantsPage:
                     ft.Icon(ft.Icons.ERROR, size=64, color=ft.Colors.RED_400),
                     ft.Text("Error loading applicants",
                             size=16, color=ft.Colors.RED_600),
-                    ft.Text(str(e), size=12, color=ft.Colors.GREY_600),], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
+                    ft.Text(str(e), size=12, color=ft.Colors.GREY_600),
+                ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                 alignment=ft.alignment.center,
                 expand=True
             )
@@ -212,6 +282,81 @@ class ApplicantsPage:
             ),
             elevation=2
         )
+
+    def _build_pagination_controls(self) -> ft.Control:
+        """Build pagination controls"""
+        return ft.Container(
+            content=ft.Row([
+                self.prev_button,
+                self.pagination_info,
+                self.page_input,
+                self.next_button,
+                ft.Container(expand=True),
+                ft.Dropdown(
+                    label="Items per page",
+                    value=str(self.items_per_page),
+                    options=[
+                        ft.dropdown.Option("5", "5"),
+                        ft.dropdown.Option("10", "10"),
+                        ft.dropdown.Option("20", "20"),
+                        ft.dropdown.Option("50", "50")
+                    ],
+                    width=120,
+                    on_change=self._on_items_per_page_change
+                )
+            ], alignment=ft.MainAxisAlignment.CENTER, spacing=10),
+            padding=10,
+            border=ft.border.only(top=ft.BorderSide(1, ft.Colors.GREY_300))
+        )
+
+    def _update_pagination_controls(self):
+        """Update pagination control states"""
+        if self.pagination_info:
+            start_item = (self.current_page - 1) * self.items_per_page + 1
+            end_item = min(self.current_page *
+                           self.items_per_page, self.total_applicants)
+            self.pagination_info.value = f"Page {self.current_page} of {self.total_pages} ({start_item}-{end_item} of {self.total_applicants})"
+
+        if self.prev_button:
+            self.prev_button.disabled = self.current_page <= 1
+
+        if self.next_button:
+            self.next_button.disabled = self.current_page >= self.total_pages
+
+        if self.page_input:
+            self.page_input.value = str(self.current_page)
+
+    def _on_prev_page(self, e):
+        """Handle previous page button click"""
+        if self.current_page > 1:
+            self.current_page -= 1
+            self._refresh_applicants_list()
+
+    def _on_next_page(self, e):
+        """Handle next page button click"""
+        if self.current_page < self.total_pages:
+            self.current_page += 1
+            self._refresh_applicants_list()
+
+    def _on_page_input_submit(self, e):
+        """Handle page input submission"""
+        try:
+            page = int(self.page_input.value)
+            if 1 <= page <= self.total_pages:
+                self.current_page = page
+                self._refresh_applicants_list()
+            else:
+                self.page_input.value = str(self.current_page)
+                self.page.update()
+        except ValueError:
+            self.page_input.value = str(self.current_page)
+            self.page.update()
+
+    def _on_items_per_page_change(self, e):
+        """Handle items per page change"""
+        self.items_per_page = int(e.control.value)
+        self.current_page = 1  # Reset to first page
+        self._refresh_applicants_list()
 
     def _on_create_applicant(self, e):
         """Handle create applicant button click"""

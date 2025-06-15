@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 # Load environment variables from .env file FIRST - DO NOT MOVE THIS
 load_dotenv()
 
+
 import os
 from pathlib import Path
 import sys
@@ -13,7 +14,6 @@ from database.models.init_database import get_schema_info
 from database import init_db, SessionLocal, ApplicantProfile
 import flet as ft
 from database.models.database import DATABASE_URL
-
 
 
 # Add the src directory to the Python path
@@ -60,8 +60,7 @@ def main(page: ft.Page):
                 print(f"    - {col_name}: {col_type}")
         print("\nTesting database connection...")
         db = SessionLocal()
-        try:
-            # Test query
+        try:            # Test query
             result = db.query(ApplicantProfile).first()
             print("Database connection successful")
             if result:
@@ -80,13 +79,14 @@ def main(page: ft.Page):
 
         print("Initializing search engine...")
         search_engine = SearchEngine()
+        print("Search engine initialized successfully")
 
-        try:
-            print("Reading CVs")
-            cv_processor.process_csv_resumes()
-        except Exception as e:
-            print(f"Error reading CVs: {e}")
-            raise
+        # try:
+        #     print("Reading CVs")
+        #     cv_processor.process_csv_resumes()
+        # except Exception as e:
+        #     print(f"Error reading CVs: {e}")
+        #     raise
 
         print("CV processor initialized successfully")
 

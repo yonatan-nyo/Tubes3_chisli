@@ -9,11 +9,11 @@ class ApplicantProfile(Base):
     __tablename__ = "applicant_profiles"
 
     applicant_id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String(50), nullable=True)
-    last_name = Column(String(50), nullable=True)
+    first_name = Column(Text, nullable=True)
+    last_name = Column(Text, nullable=True)
     date_of_birth = Column(Date, nullable=True)
-    address = Column(String(255), nullable=True)
-    phone_number = Column(String(20), nullable=True)
+    address = Column(Text, nullable=True)
+    phone_number = Column(Text, nullable=True)
     is_encrypted = Column(Boolean, default=False,
                           nullable=False)  # New encryption flag
 
