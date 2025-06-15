@@ -210,40 +210,6 @@ class MainWindow:
         if hasattr(self, 'search_page'):
             self.search_page.on_search_performed(results)
 
-    # def on_result_selected(self, applicant_id: int):
-    #     """Handle result selection"""
-    #     try:
-    #         db = self.session_factory()
-    #         try:
-    #             applicant = db.query(Applicant).filter(Applicant.id == applicant_id).first()
-    #             if applicant:
-    #                 applicant_data = applicant.to_dict()  # Ensure this method exists and works
-
-    #                 # Prepare the detail view content
-    #                 detail_view_content = self.detail_view.build(applicant_data)
-
-    #                 self.current_view = "detail"
-    #                 self.page.clean()  # Clear all existing content from the page
-    #                 self.page.add(detail_view_content)  # Add the new detail view
-    #                 self.page.update()
-    #             else:
-    #                 self.page.snack_bar = ft.SnackBar(
-    #                     content=ft.Text(f"Applicant with ID {applicant_id} not found."),
-    #                     bgcolor=ft.Colors.YELLOW_200
-    #                 )
-    #                 self.page.snack_bar.open = True
-    #                 self.page.update()
-    #                 print(f"Applicant with ID {applicant_id} not found") # Keep console log for debugging
-    #         finally:
-    #             db.close()
-    #     except Exception as e:
-    #         self.page.snack_bar = ft.SnackBar(
-    #             content=ft.Text(f"Error loading applicant details: {str(e)}"),
-    #             bgcolor=ft.Colors.RED_100
-    #         )    #         self.page.snack_bar.open = True
-    #         self.page.update()
-    #         print(f"Error loading applicant details: {e}") # Keep console log
-
     def on_result_selected(self, applicant_id: int):
         """Handle result selection"""
         self.selected_applicant_id = applicant_id
