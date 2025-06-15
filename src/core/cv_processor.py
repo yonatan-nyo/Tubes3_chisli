@@ -359,7 +359,7 @@ class CVProcessor:
             base_name = os.path.splitext(original_cv_filename)[0]
             safe_base_name = re.sub(r'[^\w\.-]', '_', base_name)
             txt_filename = f"{timestamp}_{safe_base_name}_extracted.txt"
-            txt_filepath = os.path.join(self.txt_storage_path, txt_filename)
+            txt_filepath = os.path.join(self.txt_storage_path, txt_filename).replace('\\', '/')
             with open(txt_filepath, 'w', encoding='utf-8') as txt_file:
                 txt_file.write("=" * 50 + "\nEXTRACTED TEXT FROM CV\n")
                 txt_file.write(f"Source Reference: {original_cv_filename}\n")
@@ -388,8 +388,7 @@ class CVProcessor:
             safe_original_filename = re.sub(
                 r'[^\w\.-]', '_', original_filename)
             stored_cv_filename = f"{timestamp}_{safe_original_filename}"
-            stored_cv_path = os.path.join(
-                self.cv_storage_path, stored_cv_filename)
+            stored_cv_path = os.path.join(self.cv_storage_path, stored_cv_filename).replace('\\', '/')
             shutil.copy2(file_path, stored_cv_path)
             txt_filepath = self.save_extracted_text_to_file(
                 # Pass category as None for direct PDF processing, or derive if possible
