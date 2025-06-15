@@ -186,9 +186,9 @@ def _get_searchable_text_worker(applicant: Dict, cv_processor: CVProcessor) -> s
         return safe_get_str(applicant, 'application_role', '')
 
 
-def _process_chunk_fuzzy(applicant_chunk: List[Dict], keywords: List[str],
-                         threshold: float) -> Dict[int, Dict]:
-    """Worker function for parallel fuzzy matching"""
+def _process_chunk_fuzzy_dynamic(applicant_chunk: List[Dict], keywords: List[str],
+                                 dynamic_thresholds: Dict[str, float]) -> Dict[int, Dict]:
+    """Worker function for parallel fuzzy matching with dynamic thresholds per keyword"""
     results = {}
 
     try:
@@ -210,10 +210,12 @@ def _process_chunk_fuzzy(applicant_chunk: List[Dict], keywords: List[str],
             for keyword in keywords:
                 best_match = None
                 best_similarity = 0
+                keyword_threshold = dynamic_thresholds.get(
+                    keyword, 0.7)  # Default fallback
 
                 for word in words:
                     similarity = fuzzy_matcher.similarity_ratio(keyword, word)
-                    if similarity >= threshold and similarity > best_similarity:
+                    if similarity >= keyword_threshold and similarity > best_similarity:
                         best_similarity = similarity
                         best_match = word
 
@@ -235,11 +237,11 @@ def _process_chunk_fuzzy(applicant_chunk: List[Dict], keywords: List[str],
                 }
 
         print(
-            f"Fuzzy worker processed {len(applicant_chunk)} applicants, found {len(results)} matches")
+            f"Dynamic fuzzy worker processed {len(applicant_chunk)} applicants, found {len(results)} matches")
         return results
 
     except Exception as e:
-        print(f"Error in fuzzy worker process: {e}")
+        print(f"Error in dynamic fuzzy worker process: {e}")
         return {}
 
 

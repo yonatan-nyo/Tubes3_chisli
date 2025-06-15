@@ -102,9 +102,8 @@ class ResultsSection:
                             ft.Icon(ft.Icons.SEARCH_OFF, size=48,
                                     color=ft.Colors.GREY_400),
                             ft.Text("No matching CVs found", size=16,
-                                    color=ft.Colors.GREY_600),
-                            ft.Text("Try different keywords or lower the fuzzy threshold",
-                                    size=12, color=ft.Colors.GREY_500)
+                                    color=ft.Colors.GREY_600),                            ft.Text("Try different keywords or broaden your search criteria",
+                                                                                                  size=12, color=ft.Colors.GREY_500)
                         ], horizontal_alignment=ft.CrossAxisAlignment.CENTER),
                         alignment=ft.alignment.center,
                         padding=40

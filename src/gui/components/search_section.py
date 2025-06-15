@@ -48,18 +48,6 @@ class SearchSection:
             prefix_icon=ft.Icons.FILTER_LIST
         )
 
-        # Create threshold label text component
-        self.threshold_label = ft.Text(f"Fuzzy Threshold: {0.7:.1f}", size=14)
-
-        self.fuzzy_threshold_slider = ft.Slider(
-            min=0.1,
-            max=1.0,
-            value=0.7,
-            divisions=9,
-            width=300,
-            on_change=self.on_threshold_change
-        )
-
         self.search_button = ft.ElevatedButton(
             "Search CVs",
             on_click=self.perform_search,
@@ -107,12 +95,6 @@ class SearchSection:
             color=ft.Colors.GREY_600,
             visible=False
         )
-
-    def on_threshold_change(self, e):
-        """Handle threshold slider value change"""
-        value = e.control.value
-        self.threshold_label.value = f"Fuzzy Threshold: {value:.1f}"
-        self.page.update()
 
     def on_multiprocessing_toggle(self, e):
         """Handle multiprocessing toggle change"""
@@ -198,24 +180,6 @@ class SearchSection:
                     bgcolor=ft.Colors.GREY_50,
                     border_radius=10,
                     border=ft.border.all(1, ft.Colors.GREY_200),
-                    margin=ft.Margin(0, 0, 0, 20)
-                ),
-
-                # Fuzzy matching section
-                ft.Container(
-                    content=ft.Column([
-                        self.threshold_label,
-                        self.fuzzy_threshold_slider,
-                        ft.Text(
-                            "💡 Higher values = more strict matching",
-                            size=12,
-                            color=ft.Colors.GREY_600
-                        )
-                    ], spacing=8),
-                    padding=15,
-                    bgcolor=ft.Colors.BLUE_50,
-                    border_radius=10,
-                    border=ft.border.all(1, ft.Colors.BLUE_200),
                     margin=ft.Margin(0, 0, 0, 20)
                 ),
 
@@ -309,15 +273,11 @@ class SearchSection:
             if max_results <= 0:
                 max_results = 10
         except ValueError:
-            max_results = 10
-
-        # Print search parameters to terminal
-        fuzzy_threshold = self.fuzzy_threshold_slider.value
+            max_results = 10        # Print search parameters to terminal
         print(f"\n🔍 Starting CV Search:")
         print(f"   Keywords: {', '.join(keywords)}")
         print(f"   Algorithm: {algorithm}")
         print(f"   Max Results: {max_results}")
-        print(f"   Fuzzy Threshold: {fuzzy_threshold:.2f}")
         print(
             f"   Multiprocessing: {'Enabled' if self.multiprocessing_toggle.value else 'Disabled'}")
 
@@ -340,7 +300,6 @@ class SearchSection:
                     keywords=keywords,
                     algorithm=algorithm,
                     max_results=max_results,
-                    fuzzy_threshold=fuzzy_threshold,
                     progress_callback=self.update_progress,  # Real progress from search engine
                     # Pass multiprocessing setting
                     use_multiprocessing=self.multiprocessing_toggle.value
@@ -384,11 +343,7 @@ class SearchSection:
         self.keywords_field.value = ""
         self.algorithm_dropdown.value = "KMP"
         self.max_results_field.value = "10"
-        self.fuzzy_threshold_slider.value = 0.7
         self.multiprocessing_toggle.value = True  # Reset to default enabled
-
-        # Update the threshold label when clearing
-        self.threshold_label.value = f"Fuzzy Threshold: {0.7:.1f}"
 
         print("📝 Search form reset to defaults")
         # Clear results by calling callback with empty results

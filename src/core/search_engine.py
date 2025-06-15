@@ -18,7 +18,7 @@ from core.search_utils import (
 )
 from core.search_workers import (
     _process_chunk_exact,
-    _process_chunk_fuzzy,
+    _process_chunk_fuzzy_dynamic,
     _process_applicant_chunk
 )
 from core.cv_processor import CVProcessor
@@ -49,6 +49,37 @@ def _test_multiprocessing_worker():
     return True
 
 
+def calculate_dynamic_threshold(search_term: str) -> float:
+    """
+    Calculate dynamic fuzzy threshold based on search term length.
+    Longer terms allow for more typos, shorter terms require stricter matching.
+    Uses stricter thresholds (0.7-1.0 range) for better precision.
+
+    Args:
+        search_term: The search keyword
+
+    Returns:
+        float: Dynamic threshold between 0.7 and 1.0
+    """
+    term_length = len(search_term.strip())
+
+    if term_length <= 3:
+        # Very short terms: exact match
+        return 1.0
+    elif term_length <= 5:
+        # Short terms: very strict (0.95)
+        return 0.95
+    elif term_length <= 8:
+        # Medium terms: strict (0.85)
+        return 0.85
+    elif term_length <= 12:
+        # Long terms: moderately strict (0.8)
+        return 0.8
+    else:
+        # Very long terms: still strict but most tolerant (0.7)
+        return 0.7
+
+
 class SearchEngine:
     """Main search engine for CV matching with type safety and multiprocessing support"""
 
@@ -62,7 +93,7 @@ class SearchEngine:
         self.cv_processor: CVProcessor = CVProcessor()
 
     def search(self, keywords: List[str], algorithm: str = "KMP",
-               max_results: int = 10, fuzzy_threshold: float = 0.7,
+               max_results: int = 10, fuzzy_threshold: float = None,
                progress_callback: Optional[callable] = None,
                use_multiprocessing: bool = False) -> Dict[str, Any]:
         """Perform CV search with specified algorithm using type safety and real progress tracking"""
@@ -76,9 +107,20 @@ class SearchEngine:
                 print(f"SearchEngine: {message} ({progress:.0f}%)")
 
         try:
-            # Validate and sanitize inputs
-            keywords, algorithm, max_results, fuzzy_threshold = validate_search_params(
-                keywords, algorithm, max_results, fuzzy_threshold)
+            # Validate and sanitize inputs (without fuzzy_threshold for now)
+            keywords, algorithm, max_results, _ = validate_search_params(
+                keywords, algorithm, max_results, 0.7)  # Temporary value for validation
+
+            # Calculate dynamic thresholds for each keyword
+            dynamic_thresholds = {}
+            for keyword in keywords:
+                dynamic_thresholds[keyword] = calculate_dynamic_threshold(
+                    keyword)
+
+            print(f"🎯 Dynamic thresholds calculated:")
+            for keyword, threshold in dynamic_thresholds.items():
+                print(
+                    f"   '{keyword}' (len={len(keyword)}) -> threshold={threshold:.2f}")
 
             if not keywords:
                 update_progress(100, "No valid keywords provided")
@@ -103,13 +145,13 @@ class SearchEngine:
                     60, f"Starting optimized multiprocessing {algorithm} search on {len(applicant_dicts)} applicants...")
                 return self._multiprocessing_search(
                     applicant_dicts, keywords, algorithm, max_results,
-                    fuzzy_threshold, progress_callback, start_time)
+                    dynamic_thresholds, progress_callback, start_time)
             else:
                 update_progress(
                     60, f"Starting {algorithm} single-threaded search on {len(applicant_dicts)} applicants...")
                 return self._single_threaded_search(
                     applicant_dicts, keywords, algorithm, max_results,
-                    fuzzy_threshold, progress_callback, start_time)
+                    dynamic_thresholds, progress_callback, start_time)
 
         except Exception as e:
             print(f"Error in search: {e}")
@@ -338,9 +380,8 @@ class SearchEngine:
         cv_path = safe_get_str(detail_dict, 'cv_path', '')
         if cv_path:
             computed_fields = self.cv_processor.compute_cv_fields(cv_path)
-            detail_dict.update(computed_fields)
-
             # Flatten personal_info structure for UI compatibility
+            detail_dict.update(computed_fields)
             personal_info = computed_fields.get('personal_info', {})
             if personal_info:
                 # Override with extracted personal info if available
@@ -356,7 +397,7 @@ class SearchEngine:
         return detail_dict
 
     def _multiprocessing_search(self, applicant_dicts: List[Dict], keywords: List[str],
-                                algorithm: str, max_results: int, fuzzy_threshold: float,
+                                algorithm: str, max_results: int, dynamic_thresholds: Dict[str, float],
                                 progress_callback: Optional[callable], start_time: float) -> Dict[str, Any]:
         """Perform search using optimized multiprocessing"""
 
@@ -391,7 +432,7 @@ class SearchEngine:
                     "⚠️  Multiprocessing not available, falling back to single-threaded...")
                 return self._single_threaded_search(
                     applicant_dicts, keywords, algorithm, max_results,
-                    fuzzy_threshold, progress_callback, start_time)
+                    dynamic_thresholds, progress_callback, start_time)
 
             with ProcessPoolExecutor(max_workers=num_workers) as executor:
                 # First do exact matching
@@ -432,7 +473,7 @@ class SearchEngine:
                 70, "Exact multiprocessing failed, falling back to single-threaded...")
             return self._single_threaded_search(
                 applicant_dicts, keywords, algorithm, max_results,
-                fuzzy_threshold, progress_callback, start_time)
+                dynamic_thresholds, progress_callback, start_time)
 
         exact_time = time.time() - exact_start
         update_progress(
@@ -441,9 +482,7 @@ class SearchEngine:
         # Now do fuzzy matching in parallel
         update_progress(82, "Starting fuzzy matching...")
         fuzzy_start = time.time()
-        fuzzy_results = {}
-
-        # Find keywords that had no exact matches for fuzzy matching
+        fuzzy_results = {}        # Find keywords that had no exact matches for fuzzy matching
         keywords_with_exact_matches = set()
         for result in exact_results.values():
             keywords_with_exact_matches.update(
@@ -453,10 +492,11 @@ class SearchEngine:
             kw for kw in keywords if kw not in keywords_with_exact_matches]
 
         if keywords_for_fuzzy:
+            # Use dynamic thresholds for fuzzy matching
             try:
                 with ProcessPoolExecutor(max_workers=num_workers) as executor:
                     future_to_chunk = {
-                        executor.submit(_process_chunk_fuzzy, chunk, keywords_for_fuzzy, fuzzy_threshold): i
+                        executor.submit(_process_chunk_fuzzy_dynamic, chunk, keywords_for_fuzzy, dynamic_thresholds): i
                         for i, chunk in enumerate(chunks)
                     }
 
@@ -506,11 +546,10 @@ class SearchEngine:
             'keywords_searched': keywords,
             'multiprocessing_used': True,
             'num_workers': num_workers,
-            'chunks_processed': len(chunks)
-        }
+            'chunks_processed': len(chunks)}
 
     def _single_threaded_search(self, applicant_dicts: List[Dict], keywords: List[str],
-                                algorithm: str, max_results: int, fuzzy_threshold: float,
+                                algorithm: str, max_results: int, dynamic_thresholds: Dict[str, float],
                                 progress_callback: Optional[callable], start_time: float) -> Dict[str, Any]:
         """Perform single-threaded search"""
 
@@ -527,11 +566,10 @@ class SearchEngine:
         update_progress(
             75, f"Exact matching completed. Found {len(exact_results)} matches.")
 
-        # Perform fuzzy matching
-        update_progress(80, "Starting fuzzy matching...")
+        # Perform fuzzy matching        update_progress(80, "Starting fuzzy matching...")
         fuzzy_start = time.time()
         fuzzy_results = self._perform_fuzzy_matching(
-            applicant_dicts, keywords, fuzzy_threshold, exact_results, update_progress)
+            applicant_dicts, keywords, dynamic_thresholds, exact_results, update_progress)
         fuzzy_time = time.time() - fuzzy_start
         update_progress(
             90, f"Fuzzy matching completed. Found {len(fuzzy_results)} additional matches.")
@@ -652,7 +690,7 @@ class SearchEngine:
         return results
 
     def _perform_fuzzy_matching(self, applicant_dicts: List[Dict], keywords: List[str],
-                                threshold: float, exact_results: Dict[int, Dict],
+                                dynamic_thresholds: Dict[str, float], exact_results: Dict[int, Dict],
                                 update_progress) -> Dict[int, Dict]:
         """Perform fuzzy matching for keywords without exact matches"""
         fuzzy_results = {}
@@ -689,11 +727,13 @@ class SearchEngine:
             for keyword in keywords_for_fuzzy:
                 best_match = None
                 best_similarity = 0
+                keyword_threshold = dynamic_thresholds.get(
+                    keyword, 0.7)  # Default fallback
 
                 for word in words:
                     similarity = self.fuzzy_matcher.similarity_ratio(
                         keyword, word)
-                    if similarity >= threshold and similarity > best_similarity:
+                    if similarity >= keyword_threshold and similarity > best_similarity:
                         best_similarity = similarity
                         best_match = word
 
