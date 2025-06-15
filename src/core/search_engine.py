@@ -719,7 +719,7 @@ class SearchEngine:
         if not keywords_for_fuzzy:
             return fuzzy_results
 
-        # Perform fuzzy matching with advanced phrase matching (same as multiprocessing version)
+        # Perform fuzzy matching with advanced phrase matching
         for i, applicant in enumerate(applicant_dicts):
             if i % max(1, len(applicant_dicts) // 10) == 0:
                 progress = 80 + (i / len(applicant_dicts)) * 10  # 80% to 90%
@@ -731,77 +731,29 @@ class SearchEngine:
                 continue  # Skip if already has exact match
 
             searchable_text = get_searchable_text(applicant)
+            text_lower = searchable_text.lower()
+            text_words = text_lower.split()  # Precompute words once
 
             fuzzy_matches = {}
             total_fuzzy_score = 0
 
             for keyword in keywords_for_fuzzy:
-                best_match = None
-                best_similarity = 0
-                keyword_threshold = dynamic_thresholds.get(
-                    keyword, 0.7)  # Default fallback
+                keyword_threshold = dynamic_thresholds.get(keyword, 0.7)
+                keyword_lower = keyword.lower()
 
-                # For short keywords (single words), match against individual words
-                if len(keyword.split()) == 1:
-                    words = set(searchable_text.lower().split())
-                    for word in words:
-                        similarity = self.fuzzy_matcher.similarity_ratio(
-                            keyword.lower(), word)
-                        if similarity >= keyword_threshold and similarity > best_similarity:
-                            best_similarity = similarity
-                            best_match = word
-                else:
-                    # For longer keywords (phrases), use sliding window approach
-                    keyword_lower = keyword.lower()
-                    text_lower = searchable_text.lower()
+                # Get best match and similarity in one call
+                similarity, matched_str = self.fuzzy_matcher.substring_similarity(
+                    keyword_lower,
+                    text_lower,
+                    text_words=text_words
+                )
 
-                    # Try different window sizes around the keyword length
-                    keyword_words = keyword_lower.split()
-                    keyword_len = len(keyword_words)
-
-                    # Create sliding windows of text to compare against the keyword
-                    text_words = text_lower.split()
-
-                    # Try exact length windows first
-                    for j in range(len(text_words) - keyword_len + 1):
-                        window = ' '.join(text_words[j:j + keyword_len])
-                        # Use substring similarity for better phrase matching
-                        similarity = self.fuzzy_matcher.substring_similarity(
-                            keyword_lower, window)
-                        if similarity >= keyword_threshold and similarity > best_similarity:
-                            best_similarity = similarity
-                            best_match = window
-
-                    # If no good match found, try slightly shorter and longer windows
-                    if best_similarity < keyword_threshold:
-                        # Try shorter windows (in case some words are missing)
-                        for window_size in range(max(1, keyword_len - 2), keyword_len):
-                            for j in range(len(text_words) - window_size + 1):
-                                window = ' '.join(
-                                    text_words[j:j + window_size])
-                                similarity = self.fuzzy_matcher.substring_similarity(
-                                    keyword_lower, window)
-                                if similarity >= keyword_threshold and similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = window
-
-                        # Try longer windows (in case there are extra words)
-                        for window_size in range(keyword_len + 1, min(len(text_words) + 1, keyword_len + 3)):
-                            for j in range(len(text_words) - window_size + 1):
-                                window = ' '.join(
-                                    text_words[j:j + window_size])
-                                similarity = self.fuzzy_matcher.substring_similarity(
-                                    keyword_lower, window)
-                                if similarity >= keyword_threshold and similarity > best_similarity:
-                                    best_similarity = similarity
-                                    best_match = window
-
-                if best_match:
+                if similarity >= keyword_threshold:
                     fuzzy_matches[keyword] = {
-                        'matched_word': best_match,
-                        'similarity': best_similarity
+                        'matched_word': matched_str,
+                        'similarity': similarity
                     }
-                    total_fuzzy_score += best_similarity
+                    total_fuzzy_score += similarity
 
             if fuzzy_matches:
                 fuzzy_results[applicant_id] = {

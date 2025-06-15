@@ -2,7 +2,7 @@ from typing import List, Tuple
 
 
 class FuzzyMatcher:
-    """Fuzzy string matching using edit distance"""
+    """Fuzzy string matching using edit distance with enhanced phrase matching"""
 
     def __init__(self):
         pass
@@ -27,151 +27,121 @@ class FuzzyMatcher:
         return 1.0 - (distance / max_len)
 
     def _edit_distance(self, s1: str, s2: str) -> int:
-        """Calculate edit distance (Levenshtein distance) between two strings"""
+        """Calculate Levenshtein distance between two strings"""
         m, n = len(s1), len(s2)
 
-        # Create DP table
-        dp = [[0] * (n + 1) for _ in range(m + 1)]
+        # Optimization: use single dimension array
+        if m < n:
+            return self._edit_distance(s2, s1)
 
-        # Initialize base cases
-        for i in range(m + 1):
-            dp[i][0] = i
-        for j in range(n + 1):
-            dp[0][j] = j
+        # Previous row of distances
+        previous = list(range(n + 1))
 
-        # Fill DP table
-        for i in range(1, m + 1):
-            for j in range(1, n + 1):
-                if s1[i - 1] == s2[j - 1]:
-                    dp[i][j] = dp[i - 1][j - 1]
-                else:
-                    dp[i][j] = 1 + min(
-                        dp[i - 1][j],      # deletion
-                        dp[i][j - 1],      # insertion
-                        dp[i - 1][j - 1]   # substitution
-                    )
+        for i, ch1 in enumerate(s1):
+            current = [i + 1]
+            for j, ch2 in enumerate(s2):
+                insertions = previous[j + 1] + 1
+                deletions = current[j] + 1
+                substitutions = previous[j] + (ch1 != ch2)
+                current.append(min(insertions, deletions, substitutions))
+            previous = current
 
-        return dp[m][n]
+        return previous[n]
 
-    def find_best_matches(self, query: str, candidates: List[str],
-                          threshold: float = 0.6, max_results: int = 5) -> List[Tuple[str, float]]:
-        """Find best fuzzy matches for query in candidates"""
-        matches = []
-
-        for candidate in candidates:
-            similarity = self.similarity_ratio(query, candidate)
-            if similarity >= threshold:
-                # Sort by similarity (descending) and limit results
-                matches.append((candidate, similarity))
-        matches.sort(key=lambda x: x[1], reverse=True)
-        return matches[:max_results]
-
-    def substring_similarity(self, query: str, text: str) -> float:
+    def substring_similarity(self, query: str, text: str, text_words: List[str] = None) -> Tuple[float, str]:
         """
-        Calculate similarity using sliding window approach for better phrase matching.
-        This is more forgiving for cases where the query is a near-match of part of the text.
+        Calculate similarity and return matched substring.
+        Returns: (similarity_score, matched_substring)
         """
         if not query or not text:
-            return 0.0
+            return 0.0, ""
 
         query = query.lower().strip()
         text = text.lower().strip()
 
+        # Handle exact matches quickly
         if query == text:
-            return 1.0
+            return 1.0, text
 
-        # If query is a substring of text, give high similarity
-        if query in text:
-            return 0.9
+        # Precompute words if not provided
+        if text_words is None:
+            text_words = text.split()
 
-        # If text is a substring of query, also give high similarity
-        if text in query:
-            return 0.85
-
-        # For long phrases, use sliding window approach
         query_words = query.split()
-        text_words = text.split()
+        is_single_word = len(query_words) == 1
 
-        if len(query_words) > 1:
-            return self._sliding_window_similarity(query, text, query_words, text_words)
+        if is_single_word:
+            # Single word matching
+            best_similarity = 0.0
+            best_word = ""
+            for word in text_words:
+                similarity = self.similarity_ratio(query, word)
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_word = word
+
+            # Apply leniency for longer words
+            if len(query) > 8 and best_similarity > 0.75:
+                best_similarity = min(0.85, best_similarity + 0.1)
+
+            return best_similarity, best_word
+
         else:
-            # For single words, use regular similarity with some leniency
-            base_similarity = self.similarity_ratio(query, text)
-            # Be more forgiving for longer words
-            if len(query) > 8 and base_similarity > 0.75:
-                return min(0.85, base_similarity + 0.1)
-            return base_similarity
+            # Phrase matching
+            return self._sliding_window_similarity(query, text, query_words, text_words)
 
-    def _sliding_window_similarity(self, query: str, text: str, query_words: list, text_words: list) -> float:
-        """
-        Use sliding window approach to find the best matching substring in the text.
-        """
+    def _sliding_window_similarity(self, query: str, text: str,
+                                   query_words: List[str], text_words: List[str]) -> Tuple[float, str]:
+        """Find best matching phrase using sliding window approach"""
         best_similarity = 0.0
+        best_phrase = ""
         query_len = len(query_words)
 
-        # Try different window sizes around the query length
-        for window_size in range(max(1, query_len - 2), min(len(text_words) + 1, query_len + 3)):
-            for i in range(len(text_words) - window_size + 1):
-                window_text = ' '.join(text_words[i:i + window_size])
+        # Search window sizes: from query_len-2 to query_len+2
+        window_sizes = sorted(set([
+            query_len - 2,
+            query_len - 1,
+            query_len,
+            query_len + 1,
+            query_len + 2
+        ]))
 
-                # Calculate similarity between query and this window
-                similarity = self._phrase_similarity(query, window_text)
-                best_similarity = max(best_similarity, similarity)
+        # Filter valid window sizes
+        window_sizes = [ws for ws in window_sizes if 1 <=
+                        ws <= len(text_words)]
 
-                # Early exit if we find a very good match
+        for window_size in window_sizes:
+            for start_idx in range(len(text_words) - window_size + 1):
+                phrase = " ".join(text_words[start_idx:start_idx+window_size])
+                similarity = self._phrase_similarity(query, phrase)
+
+                # Update best match if found better
+                if similarity > best_similarity:
+                    best_similarity = similarity
+                    best_phrase = phrase
+
+                # Early exit for high confidence match
                 if similarity > 0.95:
-                    return similarity
+                    return similarity, phrase
 
-        return best_similarity
+        return best_similarity, best_phrase
 
     def _phrase_similarity(self, phrase1: str, phrase2: str) -> float:
-        """
-        Calculate similarity between two phrases with special handling for common typos.
-        """
+        """Calculate similarity between two phrases"""
         if phrase1 == phrase2:
             return 1.0
 
-        # Basic edit distance similarity
+        # Basic similarity
         base_similarity = self.similarity_ratio(phrase1, phrase2)
 
-        # Special handling for long phrases with small differences
+        # Special handling for long phrases
         if len(phrase1) > 50 or len(phrase2) > 50:
             edit_dist = self._edit_distance(phrase1, phrase2)
-            max_len = max(len(phrase1), len(phrase2))
-
-            # If only 1-3 characters different in a long phrase, boost similarity
             if edit_dist <= 1:
                 return max(base_similarity, 0.95)
             elif edit_dist <= 2:
                 return max(base_similarity, 0.90)
             elif edit_dist <= 3:
                 return max(base_similarity, 0.85)
-
-        # Word-level analysis for better typo handling
-        words1 = phrase1.split()
-        words2 = phrase2.split()
-
-        if len(words1) == len(words2):
-            word_similarities = []
-            for w1, w2 in zip(words1, words2):
-                if w1 == w2:
-                    word_similarities.append(1.0)
-                else:
-                    # More lenient similarity for individual words
-                    word_sim = self.similarity_ratio(w1, w2)
-                    # Boost similarity for common typo patterns
-                    if len(w1) > 5 and len(w2) > 5:
-                        # Check for common typos: extra/missing letters at end
-                        if w1[:-1] == w2[:-1] or w1[:-2] == w2[:-2]:
-                            word_sim = max(word_sim, 0.9)
-                        elif w1.startswith(w2) or w2.startswith(w1):
-                            word_sim = max(word_sim, 0.85)
-                    word_similarities.append(word_sim)
-
-            # Average word similarities, but be more forgiving
-            avg_similarity = sum(word_similarities) / len(word_similarities)
-            # If most words match well, boost overall similarity
-            if avg_similarity > 0.8:
-                return max(base_similarity, avg_similarity)
 
         return base_similarity
