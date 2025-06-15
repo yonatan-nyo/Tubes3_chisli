@@ -1,5 +1,6 @@
 from typing import List, Tuple, Dict
 import time
+from collections import defaultdict, deque
 
 class KMPAlgorithm:
     """Knuth-Morris-Pratt string matching algorithm"""
@@ -154,7 +155,6 @@ class BoyerMooreAlgorithm:
         
         return occurrences
 
-
 class AhoCorasickAlgorithm:
     """Aho-Corasick algorithm for multiple pattern matching (Bonus)"""
     
@@ -166,23 +166,24 @@ class AhoCorasickAlgorithm:
     
     def __init__(self, patterns: List[str]):
         self.root = self.TrieNode()
-        self.patterns = [p.lower() for p in patterns]
+        self.root.failure = self.root  # Root's failure points to itself
+        self.patterns = list(dict.fromkeys(p.lower() for p in patterns if p))
         self.build_trie()
         self.build_failure_function()
     
     def build_trie(self):
         """Build trie from patterns"""
-        for i, pattern in enumerate(self.patterns):
+        for pattern in self.patterns:
             node = self.root
             for char in pattern:
                 if char not in node.children:
                     node.children[char] = self.TrieNode()
                 node = node.children[char]
-            node.output.append(i)
+            node.output.append(self.patterns.index(pattern))
     
     def build_failure_function(self):
         """Build failure function for Aho-Corasick"""
-        queue = []
+        queue = deque()
         
         # Initialize failure function for depth 1 nodes
         for child in self.root.children.values():
@@ -191,50 +192,50 @@ class AhoCorasickAlgorithm:
         
         # Build failure function for remaining nodes
         while queue:
-            current = queue.pop(0)
+            current = queue.popleft()
             
             for char, child in current.children.items():
                 queue.append(child)
                 
                 # Find failure node
                 failure_node = current.failure
-                while failure_node and char not in failure_node.children:
+                # Traverse failures until we find one with matching char or reach root
+                while failure_node != self.root and char not in failure_node.children:
                     failure_node = failure_node.failure
                 
-                if failure_node:
+                # Set failure link for child
+                if char in failure_node.children:
                     child.failure = failure_node.children[char]
                 else:
                     child.failure = self.root
                 
-                # Add output from failure node
+                # Merge outputs from failure node
                 child.output.extend(child.failure.output)
     
     def search(self, text: str) -> Dict[str, List[int]]:
         """Find all occurrences of patterns in text"""
         text = text.lower()
-        results = {pattern: [] for pattern in self.patterns}
+        from collections import defaultdict
+        results = defaultdict(list)
         
         node = self.root
         
         for i, char in enumerate(text):
-            # Follow failure links until we find a valid transition
-            while node and char not in node.children:
+            # Traverse failure links until we find valid transition or reach root
+            while node != self.root and char not in node.children:
                 node = node.failure
             
-            if node:
+            # Move to child node if valid transition exists
+            if char in node.children:
                 node = node.children[char]
-            else:
-                node = self.root
-                continue
             
-            # Check for pattern matches
+            # Record matches for all output patterns at current node
             for pattern_idx in node.output:
                 pattern = self.patterns[pattern_idx]
                 start_pos = i - len(pattern) + 1
                 results[pattern].append(start_pos)
         
-        return results
-
+        return dict(results)
 
 class LevenshteinDistance:
     """Levenshtein Distance algorithm for fuzzy matching"""
