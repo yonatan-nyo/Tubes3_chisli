@@ -1,3 +1,5 @@
+![CV Matching System](doc/app.png)
+
 # CV Matching System - Tubes 3 Strategi dan Algoritma
 
 Sistem pencarian dan pencocokan CV menggunakan algoritma string matching dengan antarmuka GUI yang user-friendly.
@@ -40,7 +42,7 @@ Implementasi pencarian fuzzy menggunakan similarity ratio untuk menangani typo d
 - MySQL Server 8.0+
 - pip (Python package manager)
 
-*Note: Python dependencies terdaftar di `requirements.txt`*
+_Note: Python dependencies terdaftar di `requirements.txt`_
 
 ## Instalasi dan Setup
 
@@ -188,14 +190,14 @@ src/
 
 **Kelompok Chisli - Tubes 3 Strategi dan Algoritma**
 
-| Nama | NIM |
-|------|-----|
+| Nama                 | NIM      |
+| -------------------- | -------- |
 | Yonatan Edward Njoto | 13523036 |
-| Benedict Presley | 13523067 |
-| Daniel Pedrosa Wu | 13523099 |
+| Benedict Presley     | 13523067 |
+| Daniel Pedrosa Wu    | 13523099 |
 
 Teknik Informatika - Institut Teknologi Bandung
 
 ---
 
-*Dibuat sebagai tugas besar mata kuliah Strategi dan Algoritma*
+_Dibuat sebagai tugas besar mata kuliah Strategi dan Algoritma_
