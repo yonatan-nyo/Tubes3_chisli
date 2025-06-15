@@ -3,6 +3,30 @@ Main search engine for CV matching with multiprocessing support.
 Refactored to be cleaner and more maintainable.
 """
 
+from database.models.applicant import ApplicantDetail
+from utils.type_safety import (
+    safe_get_str,
+    safe_get_dict,
+    safe_get_int
+)
+from core.search_utils import (
+    get_searchable_text,
+    combine_and_rank_results,
+    validate_search_params,
+    calculate_optimal_chunk_size,
+    should_use_multiprocessing
+)
+from core.search_workers import (
+    _process_chunk_exact,
+    _process_chunk_fuzzy,
+    _process_applicant_chunk
+)
+from core.cv_processor import CVProcessor
+from algorithms.fuzzy_matcher import FuzzyMatcher
+from algorithms.aho_corasick import AhoCorasickMatcher
+from algorithms.boyer_moore import BoyerMooreMatcher
+from algorithms.kmp import KMPMatcher
+from database.models.database import SessionLocal
 import time
 import multiprocessing
 import sys
@@ -23,31 +47,6 @@ if __name__ != '__main__':
 def _test_multiprocessing_worker():
     """Simple test function for multiprocessing - must be at module level"""
     return True
-
-from database.models.applicant import ApplicantDetail
-from database.models.database import SessionLocal
-from algorithms.kmp import KMPMatcher
-from algorithms.boyer_moore import BoyerMooreMatcher
-from algorithms.aho_corasick import AhoCorasickMatcher
-from algorithms.fuzzy_matcher import FuzzyMatcher
-from core.cv_processor import CVProcessor
-from core.search_workers import (
-    _process_chunk_exact,
-    _process_chunk_fuzzy,
-    _process_applicant_chunk
-)
-from core.search_utils import (
-    get_searchable_text,
-    combine_and_rank_results,
-    validate_search_params,
-    calculate_optimal_chunk_size,
-    should_use_multiprocessing
-)
-from utils.type_safety import (
-    safe_get_str,
-    safe_get_dict,
-    safe_get_int
-)
 
 
 class SearchEngine:
@@ -280,9 +279,7 @@ class SearchEngine:
             first_name = safe_get_str(profile, 'first_name', '')
             last_name = safe_get_str(profile, 'last_name', '')
             detail_dict['name'] = f"{first_name} {last_name}".strip(
-            ) or "Unknown"
-
-            # Flatten profile fields for easier access in detail view
+            ) or "Unknown"            # Flatten profile fields for easier access in detail view
             detail_dict['phone'] = safe_get_str(profile, 'phone_number', '')
             detail_dict['address'] = safe_get_str(profile, 'address', '')
             detail_dict['date_of_birth'] = safe_get_str(
@@ -299,6 +296,19 @@ class SearchEngine:
             computed_fields = self.cv_processor.compute_cv_fields(cv_path)
             detail_dict.update(computed_fields)
 
+            # Flatten personal_info structure for UI compatibility
+            personal_info = computed_fields.get('personal_info', {})
+            if personal_info:
+                # Override with extracted personal info if available
+                if personal_info.get('email'):
+                    detail_dict['email'] = personal_info['email']
+                if personal_info.get('phone'):
+                    detail_dict['phone'] = personal_info['phone']
+                if personal_info.get('linkedin'):
+                    detail_dict['linkedin'] = personal_info['linkedin']
+                if personal_info.get('name') and personal_info['name'] != 'Not specified':
+                    detail_dict['name'] = personal_info['name']
+
         return detail_dict
 
     def _process_single_applicant(self, detail) -> Dict:
@@ -312,9 +322,7 @@ class SearchEngine:
             first_name = safe_get_str(profile_dict, 'first_name', '')
             last_name = safe_get_str(profile_dict, 'last_name', '')
             detail_dict['name'] = f"{first_name} {last_name}".strip(
-            ) or "Unknown"
-
-            # Flatten profile fields for easier access in detail view
+            ) or "Unknown"            # Flatten profile fields for easier access in detail view
             detail_dict['phone'] = safe_get_str(
                 profile_dict, 'phone_number', '')
             detail_dict['address'] = safe_get_str(profile_dict, 'address', '')
@@ -331,6 +339,19 @@ class SearchEngine:
         if cv_path:
             computed_fields = self.cv_processor.compute_cv_fields(cv_path)
             detail_dict.update(computed_fields)
+
+            # Flatten personal_info structure for UI compatibility
+            personal_info = computed_fields.get('personal_info', {})
+            if personal_info:
+                # Override with extracted personal info if available
+                if personal_info.get('email'):
+                    detail_dict['email'] = personal_info['email']
+                if personal_info.get('phone'):
+                    detail_dict['phone'] = personal_info['phone']
+                if personal_info.get('linkedin'):
+                    detail_dict['linkedin'] = personal_info['linkedin']
+                if personal_info.get('name') and personal_info['name'] != 'Not specified':
+                    detail_dict['name'] = personal_info['name']
 
         return detail_dict
 

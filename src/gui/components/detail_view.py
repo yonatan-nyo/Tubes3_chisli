@@ -137,15 +137,16 @@ class DetailView:
                 bgcolor=ft.Colors.BLUE_50,
                 border_radius=8,
                 margin=ft.Margin(0, 0, 0, 20)
-            ),
-
-            # Contact information with file paths
+            ),            # Contact information with file paths
             self._build_info_card("Personal Information", [
                 ("Phone", safe_get_str(applicant_data, 'phone', 'Not provided')),
+                ("Email", safe_get_str(applicant_data, 'email', 'Not provided')),
+                ("LinkedIn", safe_get_str(applicant_data, 'linkedin', 'Not provided')),
                 ("Address", safe_get_str(applicant_data, 'address', 'Not provided')),
                 ("Date of Birth", safe_get_str(
-                    applicant_data, 'date_of_birth', 'Not provided')),                ("Role", safe_get_str(applicant_data,
-                                                                                                            'application_role', 'Not specified')),
+                    applicant_data, 'date_of_birth', 'Not provided')),
+                ("Role", safe_get_str(applicant_data,
+                                      'application_role', 'Not specified')),
                 ("PDF File", os.path.basename(safe_get_str(
                     applicant_data, 'cv_path', 'N/A'))),
                 ("TXT File", "Computed from CV")
