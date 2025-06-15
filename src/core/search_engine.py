@@ -53,31 +53,44 @@ def calculate_dynamic_threshold(search_term: str) -> float:
     """
     Calculate dynamic fuzzy threshold based on search term length.
     Longer terms allow for more typos, shorter terms require stricter matching.
-    Uses stricter thresholds (0.7-1.0 range) for better precision.
+    Uses more lenient thresholds (0.5-1.0 range) for better phrase matching.
 
     Args:
         search_term: The search keyword
 
     Returns:
-        float: Dynamic threshold between 0.7 and 1.0
+        float: Dynamic threshold between 0.5 and 1.0
     """
     term_length = len(search_term.strip())
+    word_count = len(search_term.strip().split())
 
-    if term_length <= 3:
-        # Very short terms: exact match
-        return 1.0
-    elif term_length <= 5:
-        # Short terms: very strict (0.95)
-        return 0.95
-    elif term_length <= 8:
-        # Medium terms: strict (0.85)
-        return 0.85
-    elif term_length <= 12:
-        # Long terms: moderately strict (0.8)
-        return 0.8
+    # For phrases (multiple words), be more lenient
+    if word_count > 1:
+        if term_length <= 20:
+            return 0.7   # Short phrases
+        elif term_length <= 50:
+            return 0.65  # Medium phrases
+        elif term_length <= 100:
+            return 0.6   # Long phrases
+        else:
+            return 0.55  # Very long phrases (most lenient)
     else:
-        # Very long terms: still strict but most tolerant (0.7)
-        return 0.7
+        # For single words, use stricter thresholds but still more lenient than before
+        if term_length <= 3:
+            # Very short terms: exact match
+            return 1.0
+        elif term_length <= 5:
+            # Short terms: very strict (0.9)
+            return 0.9
+        elif term_length <= 8:
+            # Medium terms: strict (0.8)
+            return 0.8
+        elif term_length <= 12:
+            # Long terms: moderately strict (0.75)
+            return 0.75
+        else:
+            # Very long terms: more tolerant (0.7)
+            return 0.7
 
 
 class SearchEngine:
@@ -678,21 +691,20 @@ class SearchEngine:
                     total_matches += len(pattern_matches[keyword])
 
             if matches:
-                results[applicant_id] = {
-                    'applicant': applicant,
-                    'exact_matches': matches,
-                    'total_exact_matches': total_matches,
-                    'fuzzy_matches': {},
-                    'total_fuzzy_matches': 0,
-                    'overall_score': total_matches
-                }
+                results[applicant_id] = {'applicant': applicant,
+                                         'exact_matches': matches,
+                                         'total_exact_matches': total_matches,
+                                         'fuzzy_matches': {},
+                                         'total_fuzzy_matches': 0,
+                                         'overall_score': total_matches
+                                         }
 
         return results
 
     def _perform_fuzzy_matching(self, applicant_dicts: List[Dict], keywords: List[str],
                                 dynamic_thresholds: Dict[str, float], exact_results: Dict[int, Dict],
                                 update_progress) -> Dict[int, Dict]:
-        """Perform fuzzy matching for keywords without exact matches"""
+        """Perform fuzzy matching for keywords without exact matches using advanced phrase matching"""
         fuzzy_results = {}
 
         # Find keywords that had no exact matches
@@ -707,7 +719,7 @@ class SearchEngine:
         if not keywords_for_fuzzy:
             return fuzzy_results
 
-        # Perform fuzzy matching
+        # Perform fuzzy matching with advanced phrase matching (same as multiprocessing version)
         for i, applicant in enumerate(applicant_dicts):
             if i % max(1, len(applicant_dicts) // 10) == 0:
                 progress = 80 + (i / len(applicant_dicts)) * 10  # 80% to 90%
@@ -719,7 +731,6 @@ class SearchEngine:
                 continue  # Skip if already has exact match
 
             searchable_text = get_searchable_text(applicant)
-            words = set(searchable_text.lower().split())
 
             fuzzy_matches = {}
             total_fuzzy_score = 0
@@ -730,12 +741,60 @@ class SearchEngine:
                 keyword_threshold = dynamic_thresholds.get(
                     keyword, 0.7)  # Default fallback
 
-                for word in words:
-                    similarity = self.fuzzy_matcher.similarity_ratio(
-                        keyword, word)
-                    if similarity >= keyword_threshold and similarity > best_similarity:
-                        best_similarity = similarity
-                        best_match = word
+                # For short keywords (single words), match against individual words
+                if len(keyword.split()) == 1:
+                    words = set(searchable_text.lower().split())
+                    for word in words:
+                        similarity = self.fuzzy_matcher.similarity_ratio(
+                            keyword.lower(), word)
+                        if similarity >= keyword_threshold and similarity > best_similarity:
+                            best_similarity = similarity
+                            best_match = word
+                else:
+                    # For longer keywords (phrases), use sliding window approach
+                    keyword_lower = keyword.lower()
+                    text_lower = searchable_text.lower()
+
+                    # Try different window sizes around the keyword length
+                    keyword_words = keyword_lower.split()
+                    keyword_len = len(keyword_words)
+
+                    # Create sliding windows of text to compare against the keyword
+                    text_words = text_lower.split()
+
+                    # Try exact length windows first
+                    for j in range(len(text_words) - keyword_len + 1):
+                        window = ' '.join(text_words[j:j + keyword_len])
+                        # Use substring similarity for better phrase matching
+                        similarity = self.fuzzy_matcher.substring_similarity(
+                            keyword_lower, window)
+                        if similarity >= keyword_threshold and similarity > best_similarity:
+                            best_similarity = similarity
+                            best_match = window
+
+                    # If no good match found, try slightly shorter and longer windows
+                    if best_similarity < keyword_threshold:
+                        # Try shorter windows (in case some words are missing)
+                        for window_size in range(max(1, keyword_len - 2), keyword_len):
+                            for j in range(len(text_words) - window_size + 1):
+                                window = ' '.join(
+                                    text_words[j:j + window_size])
+                                similarity = self.fuzzy_matcher.substring_similarity(
+                                    keyword_lower, window)
+                                if similarity >= keyword_threshold and similarity > best_similarity:
+                                    best_similarity = similarity
+                                    best_match = window
+
+                        # Try longer windows (in case there are extra words)
+                        for window_size in range(keyword_len + 1, min(len(text_words) + 1, keyword_len + 3)):
+                            for j in range(len(text_words) - window_size + 1):
+                                window = ' '.join(
+                                    text_words[j:j + window_size])
+                                similarity = self.fuzzy_matcher.substring_similarity(
+                                    keyword_lower, window)
+                                if similarity >= keyword_threshold and similarity > best_similarity:
+                                    best_similarity = similarity
+                                    best_match = window
 
                 if best_match:
                     fuzzy_matches[keyword] = {
