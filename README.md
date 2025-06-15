@@ -8,7 +8,7 @@ Sistem pencarian dan pencocokan CV menggunakan algoritma string matching dengan 
 
 ### 1. Knuth-Morris-Pratt (KMP)
 
-Algoritma pencarian string yang efisien dengan kompleksitas waktu O(n+m). KMP menggunakan failure function untuk menghindari perbandingan karakter yang tidak perlu ketika terjadi mismatch, sehingga tidak perlu mundur ke awal pattern.
+Algoritma pencarian string yang efisien dengan kompleksitas waktu O(n+m). KMP menggunakan prefix function untuk menghindari perbandingan karakter yang tidak perlu ketika terjadi mismatch, sehingga tidak perlu mundur ke awal pattern.
 
 **Keunggulan:**
 
@@ -28,7 +28,7 @@ Algoritma pencarian string yang melakukan pencocokan dari kanan ke kiri pada pat
 
 ### 3. Aho-Corasick (AC)
 
-Algoritma untuk pencarian multiple pattern secara simultan dalam satu kali pass. Menggunakan struktur data trie dengan failure links.
+Algoritma untuk pencarian multiple pattern secara simultan dalam satu kali pass. Menggunakan struktur data trie dengan failure links untuk membentuk finite state automata.
 
 ### 4. Fuzzy Matching
 
