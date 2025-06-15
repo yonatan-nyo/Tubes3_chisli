@@ -20,11 +20,30 @@ class DetailView:
 
     def build(self, applicant_data: Dict[str, Any]) -> ft.Control:
         """Build detailed view for applicant with type safety"""
-        try:
-            # Validate input data
+        try:            # Validate input data
             if not is_dict(applicant_data):
                 raise TypeSafetyError(
                     f"Expected dictionary, got {type(applicant_data)}")
+
+            # Check if CV file exists
+            cv_path = safe_get_str(applicant_data, 'cv_path', '')
+            cv_file_exists = cv_path and os.path.exists(cv_path)
+
+            # If CV doesn't exist, try alternative paths
+            if not cv_file_exists and cv_path:
+                # Try absolute path
+                abs_path = os.path.abspath(cv_path)
+                if os.path.exists(abs_path):
+                    cv_file_exists = True
+                    applicant_data['cv_path'] = abs_path
+                else:
+                    # Try relative to project root
+                    project_root = os.path.dirname(
+                        os.path.dirname(os.path.dirname(__file__)))
+                    relative_path = os.path.join(project_root, cv_path)
+                    if os.path.exists(relative_path):
+                        cv_file_exists = True
+                        applicant_data['cv_path'] = relative_path
 
             return ft.Column([
                 # Header with back button
@@ -35,17 +54,8 @@ class DetailView:
                             on_click=lambda e: self.on_back_callback()
                         ),
                         ft.Container(expand=True),
-                        ft.Row([ft.ElevatedButton(
-                            "View Full CV",
-                                on_click=lambda e: self._open_cv_file(
-                                    safe_get_str(applicant_data, 'cv_path', ''))
-                                ),
-                                ft.ElevatedButton(
-                                "View Extracted Text",
-                                on_click=lambda e: self._open_txt_file(
-                                    safe_get_str(applicant_data, 'cv_path', ''))
-                                )
-                                ], spacing=10)
+                        self._build_cv_action_buttons(
+                            applicant_data, cv_file_exists)
                     ]),
                     padding=20,
                     bgcolor=ft.Colors.BLUE_50,
@@ -135,7 +145,7 @@ class DetailView:
                 ("Address", safe_get_str(applicant_data, 'address', 'Not provided')),
                 ("Date of Birth", safe_get_str(
                     applicant_data, 'date_of_birth', 'Not provided')),                ("Role", safe_get_str(applicant_data,
-                                                                                                            'applicant_role', 'Not specified')),
+                                                                                                            'application_role', 'Not specified')),
                 ("PDF File", os.path.basename(safe_get_str(
                     applicant_data, 'cv_path', 'N/A'))),
                 ("TXT File", "Computed from CV")
@@ -479,10 +489,23 @@ class DetailView:
 
     def _open_cv_file(self, file_path: str):
         """Open CV file with default system application"""
+
+        if file_path:
+            file_exists = os.path.exists(file_path)
+
+            if not file_exists:
+                # Try to construct absolute path
+                abs_path = os.path.abspath(file_path)
+
         if not file_path or not os.path.exists(file_path):
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("CV file not found"),
-                bgcolor=ft.Colors.RED_100
+                content=ft.Row([
+                    ft.Icon(ft.Icons.ERROR, color=ft.Colors.WHITE),
+                    ft.Text("CV file not found", color=ft.Colors.WHITE,
+                            weight=ft.FontWeight.BOLD)
+                ]),
+                bgcolor=ft.Colors.RED_600,
+                duration=5000  # Show for 5 seconds
             )
             self.page.snack_bar.open = True
             self.page.update()
@@ -490,16 +513,28 @@ class DetailView:
 
         try:
             system = platform.system()
+
             if system == "Windows":
-                os.startfile(file_path)
+                # Use absolute path for Windows
+                abs_path = os.path.abspath(file_path)
+                os.startfile(abs_path)
             elif system == "Darwin":  # macOS
-                subprocess.run(["open", file_path])
+                result = subprocess.run(
+                    ["open", file_path], capture_output=True, text=True)
             else:  # Linux
-                subprocess.run(["xdg-open", file_path])
+                result = subprocess.run(
+                    ["xdg-open", file_path], capture_output=True, text=True)
+
         except Exception as e:
+
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text(f"Error opening CV file: {str(e)}"),
-                bgcolor=ft.Colors.RED_100
+                content=ft.Row([
+                    ft.Icon(ft.Icons.ERROR, color=ft.Colors.WHITE),
+                    ft.Text(
+                        f"Error opening CV: {str(e)}", color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+                ]),
+                bgcolor=ft.Colors.RED_600,
+                duration=5000
             )
             self.page.snack_bar.open = True
             self.page.update()
@@ -508,8 +543,13 @@ class DetailView:
         """Open extracted text file or create it from CV file if needed"""
         if not cv_path:
             self.page.snack_bar = ft.SnackBar(
-                content=ft.Text("CV file path not provided"),
-                bgcolor=ft.Colors.RED_100
+                content=ft.Row([
+                    ft.Icon(ft.Icons.WARNING, color=ft.Colors.WHITE),
+                    ft.Text("No CV file path provided",
+                            color=ft.Colors.WHITE, weight=ft.FontWeight.BOLD)
+                ]),
+                bgcolor=ft.Colors.ORANGE_600,
+                duration=4000
             )
             self.page.snack_bar.open = True
             self.page.update()
@@ -596,3 +636,61 @@ class DetailView:
             subprocess.run(["open", file_path])
         else:  # Linux
             subprocess.run(["xdg-open", file_path])
+
+    def _build_cv_action_buttons(self, applicant_data: Dict[str, Any], cv_file_exists: bool) -> ft.Control:
+        """Build CV action buttons with proper error handling and state management"""
+        cv_path = safe_get_str(applicant_data, 'cv_path', '')
+
+        if cv_file_exists:
+            # File exists - show normal buttons
+            return ft.Row([
+                ft.ElevatedButton(
+                    "View Full CV",
+                    on_click=lambda e: self._open_cv_file(cv_path),
+                    bgcolor=ft.Colors.BLUE_600,
+                    color=ft.Colors.WHITE,
+                    icon=ft.Icons.PICTURE_AS_PDF
+                ),
+                ft.ElevatedButton(
+                    "View Extracted Text",
+                    on_click=lambda e: self._open_txt_file(cv_path),
+                    bgcolor=ft.Colors.GREEN_600,
+                    color=ft.Colors.WHITE,
+                    icon=ft.Icons.TEXT_SNIPPET
+                )
+            ], spacing=10)
+        else:
+            # File doesn't exist - show disabled buttons with error indication
+            return ft.Column([
+                ft.Row([
+                    ft.ElevatedButton(
+                        "View Full CV",
+                        on_click=None,  # Disabled
+                        bgcolor=ft.Colors.GREY_300,
+                        color=ft.Colors.GREY_600,
+                        icon=ft.Icons.ERROR,
+                        disabled=True
+                    ),
+                    ft.ElevatedButton(
+                        "View Extracted Text",
+                        on_click=None,  # Disabled
+                        bgcolor=ft.Colors.GREY_300,
+                        color=ft.Colors.GREY_600,
+                        icon=ft.Icons.ERROR,
+                        disabled=True
+                    )
+                ], spacing=10),
+                ft.Container(
+                    content=ft.Row([
+                        ft.Icon(ft.Icons.WARNING, size=16,
+                                color=ft.Colors.RED_600),
+                        ft.Text(
+                            f"CV file not found: {os.path.basename(cv_path) if cv_path else 'No path specified'}",
+                            size=12,
+                            color=ft.Colors.RED_600,
+                            weight=ft.FontWeight.W_500
+                        )
+                    ], spacing=5),
+                    padding=ft.Padding(0, 5, 0, 0)
+                )
+            ], spacing=5)

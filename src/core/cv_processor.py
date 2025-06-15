@@ -40,7 +40,7 @@ class CVProcessor:
                 f"Error extracting text with pdfplumber from {file_path}: {e}")
             return ""
 
-    def extract_applicant_role(self, text: str) -> str:
+    def extract_application_role(self, text: str) -> str:
         """Extract applicant role from CV text - first line is the applicant role"""
         if not text:
             return ""
@@ -408,7 +408,7 @@ class CVProcessor:
                                     category: Optional[str] = None, applicant_id: Optional[int] = None) -> Optional[int]:
         """Common logic to process extracted text and save to DB using new schema."""
         # Extract applicant role from first line
-        applicant_role = self.extract_applicant_role(extracted_text)
+        application_role = self.extract_application_role(extracted_text)
 
         # Ensure cv_path is never None to satisfy nullable=False constraint
         final_cv_path_for_db = cv_path_for_db
@@ -424,7 +424,7 @@ class CVProcessor:
 
         applicant_detail_data = {
             'applicant_id': applicant_id,
-            'applicant_role': applicant_role,
+            'application_role': application_role,
             'cv_path': final_cv_path_for_db
         }
 

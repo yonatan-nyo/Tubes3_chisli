@@ -1,4 +1,5 @@
 import flet as ft
+import os
 from typing import Callable, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from database.models.applicant import ApplicantProfile, ApplicantDetail
@@ -48,16 +49,14 @@ class DetailPage:
                     if not full_name:
                         full_name = f"Applicant #{display_profile.applicant_id}"
 
-                    # Parse JSON fields safely using the decrypted data
-                    # Create combined data dict using type-safe functions
+                    # Parse JSON fields safely using the decrypted data                    # Create combined data dict using type-safe functions
                     applicant_data: Dict[str, Any] = {
                         'detail_id': applicant_detail.detail_id,
                         'applicant_id': applicant_detail.applicant_id,
                         'name': full_name,
                         'email': 'Not provided',  # Email removed from new schema
                         'phone': safe_get_str({'phone': display_profile.phone_number}, 'phone', 'Not provided'),                        'cv_path': safe_get_str({'path': applicant_detail.cv_path}, 'path', ''),
-                        'applicant_role': safe_get_str({'role': applicant_detail.applicant_role}, 'role', 'Not specified'),
-                        'address': safe_get_str({'address': display_profile.address}, 'address', 'Not provided'),
+                        'application_role': safe_get_str({'role': applicant_detail.application_role}, 'role', 'Not specified'),                        'address': safe_get_str({'address': display_profile.address}, 'address', 'Not provided'),
                         'date_of_birth': format_datetime_safe(display_profile.date_of_birth, "%Y-%m-%d", 'Not provided')}
 
                     # Compute CV fields on demand using search engine

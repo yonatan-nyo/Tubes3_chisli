@@ -27,7 +27,7 @@ class ApplicantDataSchema:
     education: List[Dict[str, Any]]
     highlights: List[str]
     accomplishments: List[str]
-    applicant_role: str
+    application_role: str
     address: str
     date_of_birth: str
 
@@ -47,8 +47,8 @@ class ApplicantDataSchema:
             work_experience=safe_get_list(data, 'work_experience', []),
             education=safe_get_list(data, 'education', []),            highlights=safe_get_list(data, 'highlights', []),
             accomplishments=safe_get_list(data, 'accomplishments', []),
-            applicant_role=safe_get_str(
-                data, 'applicant_role', 'Not specified'),
+            application_role=safe_get_str(
+                data, 'application_role', 'Not specified'),
             address=safe_get_str(data, 'address', 'Not provided'),
             date_of_birth=safe_get_str(data, 'date_of_birth', 'Not provided')
         )
@@ -68,7 +68,7 @@ class ApplicantDataSchema:
             'work_experience': self.work_experience,
             'education': self.education,            'highlights': self.highlights,
             'accomplishments': self.accomplishments,
-            'applicant_role': self.applicant_role,
+            'application_role': self.application_role,
             'address': self.address,
             'date_of_birth': self.date_of_birth
         }

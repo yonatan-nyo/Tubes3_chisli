@@ -317,7 +317,7 @@ class SearchEngine:
                 text_parts.append(full_name)
 
             # Add applicant role from the detail
-            text_parts.append(safe_get_str(applicant, 'applicant_role', ''))
+            text_parts.append(safe_get_str(applicant, 'application_role', ''))
 
             # Compute CV fields on demand from CV path
             cv_path = safe_get_str(applicant, 'cv_path', '')
@@ -362,7 +362,7 @@ class SearchEngine:
             print(
                 f"Warning: Error getting searchable text from applicant data: {e}")
             # Return applicant role as fallback
-            return safe_get_str(applicant, 'applicant_role', '')
+            return safe_get_str(applicant, 'application_role', '')
 
     def _combine_and_rank_results(self, exact_results: Dict,
                                   fuzzy_results: Dict) -> List[Dict]:

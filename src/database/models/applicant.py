@@ -97,7 +97,7 @@ class ApplicantDetail(Base):
     detail_id = Column(Integer, primary_key=True, index=True)
     applicant_id = Column(Integer, ForeignKey(
         'applicant_profiles.applicant_id'), nullable=False)
-    applicant_role = Column(String(100), nullable=True)
+    application_role = Column(String(100), nullable=True)
     cv_path = Column(Text, nullable=False)
 
     # Relationship to applicant profile
@@ -108,7 +108,7 @@ class ApplicantDetail(Base):
         return {
             'detail_id': self.detail_id,
             'applicant_id': self.applicant_id,
-            'applicant_role': self.applicant_role,
+            'application_role': self.application_role,
             'cv_path': self.cv_path
         }
 
@@ -117,9 +117,9 @@ class ApplicantDetail(Base):
         """Create model instance from dictionary"""
         return cls(
             applicant_id=data.get('applicant_id'),
-            applicant_role=data.get('applicant_role'),
+            application_role=data.get('application_role'),
             cv_path=data.get('cv_path', '')
         )
 
     def __repr__(self):
-        return f"<ApplicantDetail(id={self.detail_id}, applicant_id={self.applicant_id}, role='{self.applicant_role}')>"
+        return f"<ApplicantDetail(id={self.detail_id}, applicant_id={self.applicant_id}, role='{self.application_role}')>"

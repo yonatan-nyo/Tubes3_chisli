@@ -179,7 +179,7 @@ class ApplicationsPage:
                         ft.Column([
                             ft.Text(applicant_name, size=16,
                                     weight=ft.FontWeight.BOLD),
-                            ft.Text(application.applicant_role or "No role specified",
+                            ft.Text(application.application_role or "No role specified",
                                     size=14, color=ft.Colors.GREY_600),
                         ], expand=True),                        ft.Column([
                             ft.Text(f"ID: {application.detail_id}",

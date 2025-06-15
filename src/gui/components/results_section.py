@@ -211,7 +211,7 @@ class ResultsSection:
                             overflow=ft.TextOverflow.ELLIPSIS
                         ),
                         ft.Text(
-                            safe_get_str(applicant, 'applicant_role',
+                            safe_get_str(applicant, 'application_role',
                                          'No role specified'),
                             size=13,
                             color=ft.Colors.GREY_600,
