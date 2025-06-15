@@ -36,7 +36,7 @@ class FuzzyMatcher:
         for i in range(m + 1):
             dp[i][0] = i
         for j in range(n + 1):
-            dp[0][j] = j
+              dp[0][j] = j
         
         # Fill DP table
         for i in range(1, m + 1):

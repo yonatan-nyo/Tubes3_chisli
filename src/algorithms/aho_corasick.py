@@ -12,6 +12,9 @@ class AhoCorasickMatcher:
         self.root = TrieNode()
         if patterns is not None:
             self.build_automaton(patterns)
+
+    def __call__(self, patterns: List[str]):
+        return AhoCorasickMatcher(patterns)
     
     def build_automaton(self, patterns: List[str]):
         for pattern in patterns:

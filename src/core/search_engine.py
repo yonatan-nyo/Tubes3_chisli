@@ -669,22 +669,30 @@ class SearchEngine:
             # Search all patterns at once
             pattern_matches = ac.search(searchable_text)
 
+            # Precompute pattern counts (lowercase patterns)
+            pattern_counts = {}
+            total_pattern_occurrences = 0
+            for pattern, positions in pattern_matches.items():
+                count = len(positions)
+                pattern_counts[pattern] = count
+                total_pattern_occurrences += count
+
             matches = {}
-            total_matches = 0
-
             for keyword in keywords:
-                if keyword in pattern_matches and pattern_matches[keyword]:
-                    matches[keyword] = len(pattern_matches[keyword])
-                    total_matches += len(pattern_matches[keyword])
+                # Convert keyword to lowercase for matching
+                key_lower = keyword.lower()
+                if key_lower in pattern_counts:
+                    matches[keyword] = pattern_counts[key_lower]
 
+            # Only include applicants with at least one match
             if matches:
                 results[applicant_id] = {
                     'applicant': applicant,
                     'exact_matches': matches,
-                    'total_exact_matches': total_matches,
+                    'total_exact_matches': total_pattern_occurrences,
                     'fuzzy_matches': {},
                     'total_fuzzy_matches': 0,
-                    'overall_score': total_matches
+                    'overall_score': total_pattern_occurrences
                 }
 
         return results
